@@ -64,7 +64,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/chat",
-    label: "AI Chat",
+    label: "Chat",
   },
 ];
 

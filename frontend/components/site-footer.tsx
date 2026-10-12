@@ -19,15 +19,15 @@ const TAUTAN = [
   { href: "/", label: "Beranda" },
   { href: "/dokumen-hukum", label: "Dokumen Hukum" },
   { href: "/kontak", label: "Kontak" },
-  { href: "/chat", label: "ACS" },
+  { href: "/chat", label: "Chat" },
 ];
 
 const LAYANAN = [
-  { href: "#", label: "Produk Hukum" },
-  { href: "#", label: "Dokumentasi Hukum" },
-  { href: "#", label: "Informasi Hukum" },
-  { href: "#", label: "Pencarian Dokumen" },
-  { href: "#", label: "Permohonan Informasi" },
+  { href: "/kontak", label: "Pojok Hukum" },
+  // { href: "#", label: "Dokumentasi Hukum" },
+  // { href: "#", label: "Informasi Hukum" },
+  // { href: "#", label: "Pencarian Dokumen" },
+  // { href: "#", label: "Permohonan Informasi" },
 ];
 
 export function SiteFooter() {
@@ -454,9 +454,7 @@ export function SiteFooter() {
             "
           >
             <h3 className="text-base font-semibold text-white">Layanan</h3>
-
             <div className="mt-2 h-px w-8 bg-blue-400" />
-
             <ul className="mt-6 space-y-4">
               {LAYANAN.map((item) => (
                 <li key={item.label}>
@@ -640,7 +638,6 @@ export function SiteFooter() {
           focus:outline-none
           focus:ring-2
           focus:ring-white/50
-
           ${
             showScrollTop
               ? "translate-y-0 opacity-100"

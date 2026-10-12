@@ -23,9 +23,6 @@ function newId() {
   return crypto.randomUUID();
 }
 
-/* =========================
-   EMPTY STATE (WELCOME AI)
-========================= */
 const EmptyState = ({ onSelect }: { onSelect: (text: string) => void }) => {
   const suggestions = [
     "Apa saja dasar hukum tugas Badan Intelijen Negara?",
@@ -39,19 +36,13 @@ const EmptyState = ({ onSelect }: { onSelect: (text: string) => void }) => {
       <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/70 text-white flex items-center justify-center mb-4 shadow-lg">
         <Sparkles size={26} />
       </div>
-
-      <h2 className="text-lg font-semibold mb-1">Asisten AI JDIH Intelijen</h2>
-
+      <h2 className="text-lg font-semibold mb-1">Asisten JDIH Intelijen</h2>
       <p className="text-sm text-muted-foreground mb-4 max-w-md leading-relaxed">
-        Sistem ini menyediakan informasi terkait{" "}
-        <span className="font-medium text-foreground">
-          Jaringan Dokumentasi dan Informasi Hukum
-        </span>{" "}
-        serta regulasi yang berkaitan dengan{" "}
+        Temukan informasi peraturan dan dokumen hukum yang berkaitan dengan{" "}
         <span className="font-medium text-foreground">
           Badan Intelijen Negara (BIN)
         </span>
-        .
+        . Ajukan pertanyaan seputar regulasi dan dokumentasi hukum yang tersedia di JDIH.
       </p>
 
       <p className="text-xs text-muted-foreground mb-6">
@@ -323,62 +314,19 @@ export default function AsistenAIContent() {
     }
 
     // =========================================================
-    // AMBIL PESAN USER SEBELUMNYA
-    // =========================================================
-
-    const previousUserMessages = previousConversation
-      .filter((msg) => msg.type === "user")
-      .map((msg) => msg.message.toLowerCase())
-      .join(" ");
-
-    // =========================================================
     // FOLLOW-UP YANG SECARA EKSPLISIT MERUJUK KE KONTEN HUKUM
     // =========================================================
-
     const explicitFollowUpKeywords = [
-      "peraturan itu",
-      "aturan itu",
-      "uu itu",
-      "undang-undang itu",
-      "perpres itu",
-      "pp itu",
-      "pasal itu",
-      "ayat itu",
-      "bab itu",
-      "dokumen itu",
-
-      "peraturan tersebut",
-      "aturan tersebut",
-      "uu tersebut",
-      "undang-undang tersebut",
-      "perpres tersebut",
-      "pp tersebut",
-      "pasal tersebut",
-      "ayat tersebut",
-      "bab tersebut",
-      "dokumen tersebut",
-
-      "peraturan ini",
-      "aturan ini",
-      "uu ini",
-      "undang-undang ini",
-      "perpres ini",
-      "pp ini",
-      "pasal ini",
-      "ayat ini",
-      "bab ini",
-
-      "yang dimaksud",
-      "maksudnya",
-      "apa isinya",
-      "apa maksudnya",
-      "isinya apa",
-      "tentang apa",
-      "lebih detail",
-      "lebih rinci",
-      "jelaskan lagi",
-      "jelaskan lebih lanjut",
-      "lanjutkan",
+      "peraturan itu", "aturan itu", "uu itu", "undang-undang itu",
+      "perpres itu", "pp itu", "pasal itu", "ayat itu", "bab itu", "dokumen itu",
+      "peraturan tersebut", "aturan tersebut", "uu tersebut",
+      "undang-undang tersebut", "perpres tersebut", "pp tersebut",
+      "pasal tersebut", "ayat tersebut", "bab tersebut", "dokumen tersebut",
+      "peraturan ini", "aturan ini", "uu ini", "undang-undang ini",
+      "perpres ini", "pp ini", "pasal ini", "ayat ini", "bab ini",
+      "yang dimaksud", "maksudnya", "apa isinya", "apa maksudnya",
+      "isinya apa", "tentang apa", "lebih detail", "lebih rinci",
+      "jelaskan lagi", "jelaskan lebih lanjut", "lanjutkan",
     ];
 
     if (explicitFollowUpKeywords.some((keyword) => current.includes(keyword))) {
@@ -387,29 +335,15 @@ export default function AsistenAIContent() {
 
     // =========================================================
     // REFERENSI PASAL / AYAT / BAB
-    //
-    // Contoh:
-    // "Bab 1 isinya apa?"
-    // "Pasal 3 tentang apa?"
-    // "Ayat 2 menjelaskan apa?"
     // =========================================================
-
-    const legalReferencePattern =
-      /^(bab|pasal|ayat|bagian|ketentuan)\s+[a-z0-9ivx.-]+/i;
-
+    const legalReferencePattern = /^(bab|pasal|ayat|bagian|ketentuan)\s+[a-z0-9ivx.-]+/i;
     if (legalReferencePattern.test(current)) {
       return true;
     }
 
     // =========================================================
     // PERTANYAAN TENTANG WAKTU / STATUS PERATURAN
-    //
-    // Contoh:
-    // "Tahun berapa peraturan itu dibuat?"
-    // "Kapan ditetapkan?"
-    // "Kapan berlaku?"
     // =========================================================
-
     const regulationFollowUpPatterns = [
       /^tahun berapa.*(dibuat|ditetapkan|disahkan|diterbitkan|berlaku)/i,
       /^kapan.*(dibuat|ditetapkan|disahkan|diterbitkan|berlaku)/i,
@@ -417,47 +351,61 @@ export default function AsistenAIContent() {
       /^sejak kapan.*(berlaku|diterapkan)/i,
       /^kapan.*berlaku/i,
     ];
-
     if (regulationFollowUpPatterns.some((pattern) => pattern.test(current))) {
       return true;
     }
 
     // =========================================================
     // PERTANYAAN LANJUTAN DENGAN REFERENSI "INI"
-    //
-    // Contoh:
-    // "Ini berlaku kapan?"
-    // "Ini ditetapkan kapan?"
     // =========================================================
-
     const contextualReferencePatterns = [
       /^ini\s+(berlaku|ditetapkan|disahkan|dibuat|diterbitkan)/i,
       /^ini\s+(tentang|mengatur|menjelaskan)/i,
       /^yang\s+ini\s+(tentang|mengatur|menjelaskan)/i,
     ];
-
     if (contextualReferencePatterns.some((pattern) => pattern.test(current))) {
       return true;
     }
 
     // =========================================================
-    // JIKA ADA KATA HUKUM YANG JELAS
+    // REFERENSI KATA GANTI UMUM (KATA BERAKHIRAN -NYA, ITU, INI, TERSEBUT)
     // =========================================================
-
-    if (isValidContext(current)) {
-      return true;
+    const generalReferencePattern = /\b([a-z]+nya|itu|ini|tersebut|dimaksud)\b/i;
+    if (generalReferencePattern.test(current)) {
+      // Pastikan ada riwayat obrolan dengan konteks hukum yang valid
+      const hasPreviousLegalContext = previousConversation.some(
+        (msg) => msg.type === "user" && isValidContext(msg.message)
+      );
+      if (hasPreviousLegalContext) {
+        return true;
+      }
     }
 
     // =========================================================
-    // JANGAN LAGI MENGANGGAP SEMUA PERTANYAAN PENDEK
-    // SEBAGAI FOLLOW-UP
-    //
-    // INI BAGIAN YANG MEMPERBAIKI BUG:
-    //
-    // "sepak bola" -> BLOCK
-    // "website indonesia seperti apa" -> BLOCK
-    // "ibu kota Indonesia di mana" -> BLOCK
+    // KATA TANYA SEDERHANA SEBAGAI FOLLOW UP JIKA ADA KONTEKS HUKUM SEBELUMNYA
     // =========================================================
+    const questionWordsPattern = /^(apa|siapa|kapan|di mana|dimana|ke mana|kemana|dari mana|darimana|mengapa|kenapa|bagaimana|berapa)\b/i;
+    // Jika pertanyaan sangat pendek (<= 6 kata) dan diawali kata tanya
+    if (questionWordsPattern.test(current) && current.split(/\s+/).length <= 6) {
+      const hasPreviousLegalContext = previousConversation.some(
+        (msg) => msg.type === "user" && isValidContext(msg.message)
+      );
+      // Contoh: "di mana tempat penempatannya" (5 kata) -> cocok
+      // Tapi karena "bola indonesia" tidak diawali kata tanya, maka akan di block.
+      // "ibu kota indonesia di mana" -> tidak diawali kata tanya (diawali "ibu"), di block.
+      // "di mana ibu kota indonesia" -> (5 kata), diawali "di mana". 
+      // Akan lolos JIKA sebelumnya ada konteks hukum. Ini sudah cukup aman.
+      if (hasPreviousLegalContext) {
+        return true;
+      }
+    }
+
+    // =========================================================
+    // JIKA ADA KATA HUKUM YANG JELAS
+    // =========================================================
+    if (isValidContext(current)) {
+      return true;
+    }
 
     return false;
   }
@@ -628,9 +576,8 @@ export default function AsistenAIContent() {
                         ref={
                           i === conversation.length - 1 ? lastMessageRef : null
                         }
-                        className={`flex gap-3 ${
-                          isUser ? "justify-end" : "justify-start"
-                        }`}
+                        className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"
+                          }`}
                       >
                         {!isUser && (
                           <div className="w-8 h-8 flex items-center justify-center rounded-full bg-primary text-white">
@@ -639,11 +586,10 @@ export default function AsistenAIContent() {
                         )}
 
                         <div
-                          className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                            isUser
-                              ? "bg-primary text-white rounded-br-sm"
-                              : "bg-muted rounded-bl-sm"
-                          }`}
+                          className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${isUser
+                            ? "bg-primary text-white rounded-br-sm"
+                            : "bg-muted rounded-bl-sm"
+                            }`}
                         >
                           {isUser ? (
                             <p className="whitespace-pre-wrap leading-relaxed">

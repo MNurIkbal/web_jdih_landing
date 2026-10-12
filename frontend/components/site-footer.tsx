@@ -19,7 +19,7 @@ const TAUTAN = [
   { href: "/", label: "Beranda" },
   { href: "/dokumen-hukum", label: "Dokumen Hukum" },
   { href: "/kontak", label: "Kontak" },
-  { href: "/chat", label: "Chat" },
+  { href: "/chat", label: "LARAS" },
 ];
 
 const LAYANAN = [

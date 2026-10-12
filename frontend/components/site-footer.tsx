@@ -24,10 +24,6 @@ const TAUTAN = [
 
 const LAYANAN = [
   { href: "/kontak", label: "Pojok Hukum" },
-  // { href: "#", label: "Dokumentasi Hukum" },
-  // { href: "#", label: "Informasi Hukum" },
-  // { href: "#", label: "Pencarian Dokumen" },
-  // { href: "#", label: "Permohonan Informasi" },
 ];
 
 export function SiteFooter() {
@@ -458,7 +454,8 @@ export function SiteFooter() {
             <ul className="mt-6 space-y-4">
               {LAYANAN.map((item) => (
                 <li key={item.label}>
-                  <p
+                  <Link
+                    href={item.href}
                     className="
                       group
                       flex
@@ -486,7 +483,7 @@ export function SiteFooter() {
                     />
 
                     {item.label}
-                  </p>
+                  </Link>
                 </li>
               ))}
             </ul>

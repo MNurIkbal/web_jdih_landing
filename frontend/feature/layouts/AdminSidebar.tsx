@@ -11,8 +11,10 @@ import {
   Users,
   MessageSquare,
   Settings,
+  Video,
   X,
   ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -41,6 +43,16 @@ const MENU = [
     label: "Dokumen Hukum",
     href: "/admin/dokumen-hukum",
     icon: FileText,
+  },
+  {
+    label: "Galeri",
+    href: "/admin/galeri",
+    icon: Images,
+  },
+  {
+    label: "Survey Layanan",
+    href: "/admin/survey",
+    icon: ClipboardList,
   },
   {
     label: "Pengguna",

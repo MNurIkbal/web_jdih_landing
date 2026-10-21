@@ -132,7 +132,10 @@ export default function Drawer({
         </div>
 
         <form
-          onSubmit={onSubmit}
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit?.(e);
+          }}
           className="
             flex
             min-h-0

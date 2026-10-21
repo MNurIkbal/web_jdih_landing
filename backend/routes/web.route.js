@@ -6,9 +6,14 @@ const beritaController = require("../controllers/berita.controller");
 const dokumenHukumController = require("../controllers/dokumenHukum.controller");
 const Kontakcontroller = require("../controllers/kontak.controller");
 const pengaturanController = require("../controllers/pengaturan.controller");
+const galeriController = require("../controllers/galeri.controller");
 
 // slider
 router.get("/slider", sliderController.getResult);
+
+// galeri / video
+router.get("/galeri", galeriController.getPublished);
+router.get("/galeri/:id", galeriController.getById);
 
 // berita
 router.get("/berita", beritaController.getWebList);
@@ -33,5 +38,17 @@ router.post("/kontak", Kontakcontroller.create);
 // pengaturan
 router.get("/pengaturan", pengaturanController.getOne);
 router.get("/sumarydokumenhukum", pengaturanController.getSummary);
+
+const surveyController = require("../controllers/survey.controller");
+
+// survey layanan publik
+router.get("/survey/pertanyaan", surveyController.getPublicPertanyaan);
+router.post("/survey/submit", surveyController.submitPublicJawaban);
+
+const pengunjungController = require("../controllers/pengunjung.controller");
+
+// statistik pengunjung
+router.post("/pengunjung/track", pengunjungController.track);
+router.get("/pengunjung/statistik", pengunjungController.getStatistik);
 
 module.exports = router;

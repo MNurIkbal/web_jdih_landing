@@ -9,6 +9,8 @@ const kontakRoute = require("./routes/kontak.route");
 const userRoute = require("./routes/user.route");
 const dokumenHukumRoute = require("./routes/dokumenHukum.route");
 const pengaturanRoute = require("./routes/pengaturan.route");
+const galeriRoutes = require("./routes/galeri.routes");
+const surveyRoutes = require("./routes/survey.routes");
 const authRoutes = require("./routes/auth.route");
 const WebRoute = require("./routes/web.route");
 const authMiddleware = require("./middleware/authMiddleware");
@@ -93,6 +95,9 @@ app.use("/api/master-data/dokumen-hukum",authMiddleware, dokumenHukumRoute);
 
 app.use("/api/master-data/pengaturan",authMiddleware, pengaturanRoute);
 
+app.use("/api/master-data/galeri", authMiddleware, galeriRoutes);
+app.use("/api/master-data/survey", authMiddleware, surveyRoutes);
+
 app.use((req, res) => {
   return res.status(404).json({
     success: false,
@@ -118,7 +123,7 @@ app.use((err, req, res, next) => {
   if (err.code === "LIMIT_FILE_SIZE") {
     return res.status(400).json({
       success: false,
-      message: "Ukuran file maksimal 3 MB",
+      message: "Ukuran file maksimal 5 MB",
     });
   }
 

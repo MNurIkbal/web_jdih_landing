@@ -59,6 +59,10 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dokumen  Hukum",
   },
   {
+    href: "/galeri",
+    label: "Galeri",
+  },
+  {
     href: "/kontak",
     label: "Kontak",
   },
@@ -291,10 +295,38 @@ export function Navbar() {
 
           <Link
             href="/"
-            className="group flex items-center gap-3"
+            className="group flex items-center gap-2.5 sm:gap-3 -translate-x-6 sm:-translate-x-12"
           >
-            {/* Logo BIN */}
+            {/* Logo Kiri (logo1.png) */}
+            <span
+              className={[
+                "relative flex shrink-0",
+                "items-center justify-center",
+                "transition-all duration-500",
+                "group-hover:-translate-y-0.5",
+                "group-hover:scale-105",
+                scrolled
+                  ? "h-9 w-28 sm:h-10 sm:w-36"
+                  : "h-11 w-36 sm:h-13 sm:w-48",
+              ].join(" ")}
+            >
+              <Image
+                src="/images/logo1.png"
+                alt="Logo JDIH"
+                width={200}
+                height={60}
+                priority
+                className={[
+                  "relative z-10",
+                  "h-full w-full",
+                  "object-contain",
+                  "transition-all duration-500",
+                  "group-hover:scale-110",
+                ].join(" ")}
+              />
+            </span>
 
+            {/* Logo BIN (Kanan) */}
             <span
               className={[
                 "relative flex shrink-0",
@@ -304,15 +336,15 @@ export function Navbar() {
                 "group-hover:-translate-y-0.5",
                 "group-hover:scale-105",
                 scrolled
-                  ? "h-10 w-10"
-                  : "h-14 w-14",
+                  ? "h-10 w-10 sm:h-11 sm:w-11"
+                  : "h-13 w-13 sm:h-14 sm:w-14",
               ].join(" ")}
             >
               <Image
                 src="/images/log.png"
                 alt="Logo BIN"
-                width={64}
-                height={64}
+                width={70}
+                height={70}
                 priority
                 className={[
                   "relative z-10",
@@ -324,7 +356,6 @@ export function Navbar() {
               />
 
               {/* Animasi shine */}
-
               <span
                 className={[
                   "pointer-events-none",
@@ -340,38 +371,22 @@ export function Navbar() {
               />
             </span>
 
-            {/* Text Logo */}
-
-            <span className="overflow-hidden">
+            {/* Text Logo: JDIH BIN sejajar di tengah setara logo */}
+            <span className="flex items-center">
               <span
                 className={[
-                  "block",
-                  "font-semibold",
+                  "font-bold",
+                  "tracking-wide",
                   "leading-none",
                   "text-primary-foreground",
                   "transition-all duration-500",
                   scrolled
-                    ? "text-[15px]"
-                    : "text-[18px]",
+                    ? "text-[16px] sm:text-[18px]"
+                    : "text-[20px] sm:text-[22px]",
                 ].join(" ")}
               >
-                JDIH
-              </span>
-
-              <span
-                className={[
-                  "mt-1 block",
-                  "overflow-hidden",
-                  "text-[10px]",
-                  "uppercase tracking-widest",
-                  "text-accent/90",
-                  "transition-all duration-500",
-                  scrolled
-                    ? "max-h-0 opacity-0"
-                    : "max-h-4 opacity-100",
-                ].join(" ")}
-              >
-                Badan Intelijen Negara
+                <span>JDIH</span>{" "}
+                <span className="text-accent">BIN</span>
               </span>
             </span>
           </Link>

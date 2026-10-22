@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 
 import type { ChatMessage } from "@/types/chat";
 import { sendChatMessage } from "@/services/chat-service";
+import { getSmartFallbackResponse } from "@/lib/chat-fallback";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -489,13 +490,15 @@ export default function AsistenAIContent() {
 
       setConversation((prev) => [...prev, aiMsg]);
     } catch (error) {
+      console.warn("Gagal menghubungi backend AI, beralih ke jawaban cadangan offline:", error);
+      const fallbackText = getSmartFallbackResponse(userText);
 
       setConversation((prev) => [
         ...prev,
         {
           id: newId(),
           type: "assistant",
-          message: "Terjadi error saat memproses pertanyaan.",
+          message: fallbackText,
           timestamp: nowTimestamp(),
         },
       ]);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSmartFallbackResponse } from "@/lib/chat-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,17 +58,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (!ACS_API_KEY) {
-      
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Konfigurasi server tidak lengkap (API key hilang)",
-        },
-        { status: 500 },
-      );
+      // Backend ACS API key belum diatur, gunakan fallback cerdas
+      const fallback = getSmartFallbackResponse(message);
+      return NextResponse.json({
+        success: true,
+        message: fallback,
+        isFallback: true,
+        insights: [],
+        sample_data: [],
+      });
     }
-
-    
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ACS_TIMEOUT_MS);
@@ -89,27 +89,30 @@ export async function POST(req: NextRequest) {
         signal: controller.signal,
       });
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return NextResponse.json(
-          { success: false, error: "Permintaan ke backend timeout" },
-          { status: 504 },
-        );
-      }
-      throw err;
+      // Timeout atau network fetch error ke backend ACS -> gunakan fallback
+      console.warn("Koneksi ke backend ACS error/timeout, menggunakan jawaban cadangan:", err);
+      const fallback = getSmartFallbackResponse(message);
+      return NextResponse.json({
+        success: true,
+        message: fallback,
+        isFallback: true,
+        insights: [],
+        sample_data: [],
+      });
     } finally {
       clearTimeout(timeout);
     }
 
     if (!acsRes.ok) {
-      const errorText = await acsRes.text().catch(() => "");
-      
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Gagal berkomunikasi dengan backend ACS`,
-        },
-        { status: acsRes.status },
-      );
+      console.warn(`Backend ACS merespons dengan status ${acsRes.status}, menggunakan jawaban cadangan.`);
+      const fallback = getSmartFallbackResponse(message);
+      return NextResponse.json({
+        success: true,
+        message: fallback,
+        isFallback: true,
+        insights: [],
+        sample_data: [],
+      });
     }
 
     const acsData: AcsApiResponse = await acsRes.json();
@@ -131,11 +134,21 @@ export async function POST(req: NextRequest) {
       conversationStats: acsData.conversationStats ?? null,
     });
   } catch (error: unknown) {
-    const err = error instanceof Error ? error : new Error("Unknown error");
-    
-    return NextResponse.json(
-      { success: false, error: err.message || "Internal Server Error" },
-      { status: 500 },
-    );
+    console.error("Error pada route /api/chat, beralih ke fallback:", error);
+    // Jika masih ada parameter message dalam request, berikan fallback
+    try {
+      const fallback = getSmartFallbackResponse("umum");
+      return NextResponse.json({
+        success: true,
+        message: fallback,
+        isFallback: true,
+      });
+    } catch {
+      const err = error instanceof Error ? error : new Error("Unknown error");
+      return NextResponse.json(
+        { success: false, error: err.message || "Internal Server Error" },
+        { status: 500 },
+      );
+    }
   }
 }

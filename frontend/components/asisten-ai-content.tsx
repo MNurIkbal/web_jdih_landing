@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Send, Bot, Trash2, ArrowDown, Sparkles } from "lucide-react";
 import rehypeRaw from "rehype-raw";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 import type { ChatMessage } from "@/types/chat";
@@ -558,10 +557,10 @@ export default function AsistenAIContent() {
         <div className="w-full max-w-[900px] flex flex-col h-full">
           {/* CHAT AREA */}
           <div className="relative flex-1 overflow-hidden">
-            <Card
+            <div
               ref={containerRef}
               onScroll={handleScroll}
-              className="h-full overflow-y-auto p-4"
+              className="h-full overflow-y-auto px-2 sm:px-4 py-4"
             >
               {conversation.length === 0 ? (
                 <EmptyState onSelect={(text) => setMessage(text)} />
@@ -610,7 +609,7 @@ export default function AsistenAIContent() {
                   {isTyping && <TypingDots />}
                 </div>
               )}
-            </Card>
+            </div>
 
             {/* SCROLL BUTTON */}
             {showScroll && (

@@ -103,129 +103,144 @@ export default function DasarHukumPage() {
   </div>
 </section>
 
-    <main className="min-h-screen bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-8 sm:py-20">
-          {isLoading && (
-            <div className="flex min-h-[300px] items-center justify-center">
-              <p className="text-sm text-slate-400">
-                Memuat informasi dasar hukum JDIH...
+    <main className="relative isolate min-h-screen overflow-hidden bg-gradient-to-b from-slate-50/80 via-slate-100/40 to-slate-50/90 py-14 sm:py-20">
+      {/* Ambient background decoration */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "radial-gradient(#0e3b6e 1px, transparent 1px), radial-gradient(#d4af37 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+            backgroundPosition: "0 0, 16px 16px",
+          }}
+        />
+        <div className="absolute -left-20 top-1/4 h-80 w-80 rounded-full bg-primary/[0.04] blur-3xl" />
+        <div className="absolute -right-20 top-2/3 h-96 w-96 rounded-full bg-accent/[0.06] blur-3xl" />
+      </div>
+
+      <div className="mx-auto max-w-5xl px-6 sm:px-8">
+        {isLoading && (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <p className="text-sm text-slate-400">
+              Memuat informasi dasar hukum JDIH...
+            </p>
+          </div>
+        )}
+
+        {isError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+            <p className="text-sm font-medium text-red-600">
+              Gagal memuat informasi dasar hukum JDIH.
+            </p>
+
+            <p className="mt-1 text-xs text-red-500">
+              Silakan coba kembali beberapa saat lagi.
+            </p>
+          </div>
+        )}
+
+        {!isLoading && !isError && dasar_hukum && (
+          <article
+            className="
+              max-w-none
+              text-slate-600
+              [&_p]:mb-4
+              [&_p]:text-justify
+              [&_p]:text-[15px]
+              [&_p]:leading-8
+              sm:[&_p]:text-base
+              [&_h1]:mb-5
+              [&_h1]:mt-8
+              [&_h1]:text-3xl
+              [&_h1]:font-bold
+              [&_h1]:text-slate-800
+              [&_h2]:mb-4
+              [&_h2]:mt-8
+              [&_h2]:text-2xl
+              [&_h2]:font-bold
+              [&_h2]:text-slate-800
+              [&_h3]:mb-3
+              [&_h3]:mt-6
+              [&_h3]:text-xl
+              [&_h3]:font-bold
+              [&_h3]:text-slate-800
+              [&_h4]:mb-2
+              [&_h4]:mt-5
+              [&_h4]:text-lg
+              [&_h4]:font-semibold
+              [&_h4]:text-slate-800
+              [&_ul]:my-4
+              [&_ul]:list-disc
+              [&_ul]:pl-8
+              [&_ol]:my-4
+              [&_ol]:list-decimal
+              [&_ol]:pl-8
+              [&_li]:mb-2
+              [&_a]:text-primary
+              [&_a]:underline
+              [&_strong]:font-bold
+              [&_strong]:text-slate-800
+              [&_blockquote]:my-6
+              [&_blockquote]:border-l-4
+              [&_blockquote]:border-primary
+              [&_blockquote]:bg-slate-50
+              [&_blockquote]:px-5
+              [&_blockquote]:py-3
+              [&_blockquote]:italic
+              [&_blockquote]:text-slate-500
+              [&_hr]:my-8
+              [&_hr]:border-slate-200
+              [&_figure]:my-6
+              [&_figure.image]:mx-auto
+              [&_figure.image]:w-fit
+              [&_figure.image_img]:mx-auto
+              [&_figure.image_img]:max-w-full
+              [&_figure.image_img]:rounded-xl
+              [&_figure.image_img]:object-contain
+              [&_figcaption]:mt-2
+              [&_figcaption]:text-center
+              [&_figcaption]:text-sm
+              [&_figcaption]:text-slate-500
+              [&_table]:my-6
+              [&_table]:w-full
+              [&_table]:border-collapse
+              [&_table]:border
+              [&_table]:border-slate-200
+              [&_th]:border
+              [&_th]:border-slate-200
+              [&_th]:bg-slate-50
+              [&_th]:px-4
+              [&_th]:py-3
+              [&_th]:font-semibold
+              [&_th]:text-slate-700
+              [&_td]:border
+              [&_td]:border-slate-200
+              [&_td]:px-4
+              [&_td]:py-3
+              [&_td]:text-slate-600
+              [&_img]:max-w-full
+              [&_img]:h-auto
+            "
+            dangerouslySetInnerHTML={{
+              __html: dasar_hukum,
+            }}
+          />
+        )}
+
+        {!isLoading && !isError && !dasar_hukum && (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <div className="text-center">
+              <Network className="mx-auto h-10 w-10 text-slate-300" />
+
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                Informasi dasar hukum JDIH belum tersedia.
               </p>
             </div>
-          )}
-
-          {isError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-              <p className="text-sm font-medium text-red-600">
-                Gagal memuat informasi dasar hukum JDIH.
-              </p>
-
-              <p className="mt-1 text-xs text-red-500">
-                Silakan coba kembali beberapa saat lagi.
-              </p>
-            </div>
-          )}
-
-          {!isLoading && !isError && dasar_hukum && (
-            <article
-              className="
-                max-w-none
-                text-slate-600
-                [&_p]:mb-4
-                [&_p]:text-justify
-                [&_p]:text-[15px]
-                [&_p]:leading-8
-                sm:[&_p]:text-base
-                [&_h1]:mb-5
-                [&_h1]:mt-8
-                [&_h1]:text-3xl
-                [&_h1]:font-bold
-                [&_h1]:text-slate-700
-                [&_h2]:mb-4
-                [&_h2]:mt-8
-                [&_h2]:text-2xl
-                [&_h2]:font-bold
-                [&_h2]:text-slate-700
-                [&_h3]:mb-3
-                [&_h3]:mt-6
-                [&_h3]:text-xl
-                [&_h3]:font-bold
-                [&_h3]:text-slate-700
-                [&_h4]:mb-2
-                [&_h4]:mt-5
-                [&_h4]:text-lg
-                [&_h4]:font-semibold
-                [&_h4]:text-slate-700
-                [&_ul]:my-4
-                [&_ul]:list-disc
-                [&_ul]:pl-8
-                [&_ol]:my-4
-                [&_ol]:list-decimal
-                [&_ol]:pl-8
-                [&_li]:mb-2
-                [&_a]:text-primary
-                [&_a]:underline
-                [&_strong]:font-bold
-                [&_strong]:text-slate-700
-                [&_blockquote]:my-6
-                [&_blockquote]:border-l-4
-                [&_blockquote]:border-primary
-                [&_blockquote]:bg-slate-50
-                [&_blockquote]:px-5
-                [&_blockquote]:py-3
-                [&_blockquote]:italic
-                [&_blockquote]:text-slate-500
-                [&_hr]:my-8
-                [&_hr]:border-slate-200
-                [&_figure]:my-6
-                [&_figure.image]:mx-auto
-                [&_figure.image]:w-fit
-                [&_figure.image_img]:mx-auto
-                [&_figure.image_img]:max-w-full
-                [&_figure.image_img]:rounded-xl
-                [&_figure.image_img]:object-contain
-                [&_figcaption]:mt-2
-                [&_figcaption]:text-center
-                [&_figcaption]:text-sm
-                [&_figcaption]:text-slate-500
-                [&_table]:my-6
-                [&_table]:w-full
-                [&_table]:border-collapse
-                [&_table]:border
-                [&_table]:border-slate-200
-                [&_th]:border
-                [&_th]:border-slate-200
-                [&_th]:bg-slate-50
-                [&_th]:px-4
-                [&_th]:py-3
-                [&_th]:font-semibold
-                [&_th]:text-slate-700
-                [&_td]:border
-                [&_td]:border-slate-200
-                [&_td]:px-4
-                [&_td]:py-3
-                [&_td]:text-slate-600
-                [&_img]:max-w-full
-                [&_img]:h-auto
-              "
-              dangerouslySetInnerHTML={{
-                __html: dasar_hukum,
-              }}
-            />
-          )}
-
-          {!isLoading && !isError && !dasar_hukum && (
-            <div className="flex min-h-[300px] items-center justify-center">
-              <div className="text-center">
-                <Network className="mx-auto h-10 w-10 text-slate-300" />
-
-                <p className="mt-3 text-sm font-medium text-slate-500">
-                  Informasi dasar hukum JDIH belum tersedia.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
+          </div>
+        )}
+      </div>
+    </main>
     <SiteFooter />
     </>
   );

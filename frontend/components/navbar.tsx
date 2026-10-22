@@ -907,11 +907,24 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, X, ChevronDown } from "lucide-react";
+import {
+  Menu,
+  X,
+  ChevronDown,
+  Building2,
+  Info,
+  History,
+  Scale,
+  Landmark,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 
 type NavChild = {
   href: string;
   label: string;
+  description?: string;
+  icon?: React.ComponentType<{ className?: string }>;
 };
 
 type NavItem = {
@@ -930,24 +943,34 @@ const NAV_ITEMS: NavItem[] = [
     label: "Tentang JDIH",
     children: [
       {
-        href: "/struktur-organisasi",
-        label: "Struktur Organisasi",
-      },
-      {
         href: "/tentang",
         label: "Tentang JDIH",
+        description: "Profil & tata kelola dokumentasi hukum",
+        icon: Info,
+      },
+      {
+        href: "/struktur-organisasi",
+        label: "Struktur Organisasi",
+        description: "Bagan hierarki & pengelola JDIH BIN",
+        icon: Building2,
       },
       {
         href: "/sejarah",
         label: "Sejarah",
+        description: "Perjalanan & tonggak sejarah JDIH",
+        icon: History,
       },
       {
         href: "/dasar-hukum",
         label: "Dasar Hukum",
+        description: "Landasan yuridis pembentukan & operasional",
+        icon: Scale,
       },
       {
         href: "/jdih-perwakilan",
         label: "JDIH Perwakilan",
+        description: "Jaringan integrasi perwakilan daerah",
+        icon: Landmark,
       },
     ],
   },
@@ -1212,19 +1235,34 @@ export function Navbar() {
                 {hasChildren && (
                   <div
                     className={[
-                      "absolute left-1/2 top-full z-50 w-72",
-                      "-translate-x-1/2 transition-all duration-300",
+                      "absolute left-1/2 top-full z-50 w-84",
+                      "-translate-x-1/2 pt-2 transition-all duration-300",
                       isOpen
                         ? "pointer-events-auto translate-y-0 opacity-100"
                         : "pointer-events-none -translate-y-2 opacity-0",
                     ].join(" ")}
                   >
-                    <div className="overflow-hidden rounded-b-xl border border-white/10 bg-primary shadow-2xl shadow-black/40">
-                      <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-accent to-transparent" />
+                    {/* Outer Card with layered glassmorphism & rich gradient */}
+                    <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-[#0e3b6e]/95 via-[#092b52]/98 to-[#061e38]/98 p-2.5 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                      {/* Decorative Background Elements */}
+                      <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-accent/20 blur-2xl" />
+                      <div className="pointer-events-none absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-blue-400/15 blur-2xl" />
 
-                      <div className="p-2">
+                      {/* Subtle elegant grid pattern */}
+                      <div
+                        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+                        style={{
+                          backgroundImage:
+                            "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
+                          backgroundSize: "24px 24px",
+                        }}
+                      />
+                      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent" />
+
+                      <div className="relative flex flex-col gap-1">
                         {item.children!.map((child, index) => {
                           const childActive = isChildActive(child);
+                          const Icon = child.icon;
 
                           return (
                             <Link
@@ -1233,24 +1271,26 @@ export function Navbar() {
                               onClick={() => setOpenDropdown(null)}
                               style={{
                                 transitionDelay: isOpen
-                                  ? `${index * 45}ms`
+                                  ? `${index * 35}ms`
                                   : "0ms",
                               }}
                               className={[
-                                "group/item relative flex items-center",
-                                "overflow-hidden rounded-lg px-3 py-3",
-                                "text-sm font-medium transition-all duration-300",
+                                "group/item relative flex items-center gap-3",
+                                "overflow-hidden rounded-xl p-2.5",
+                                "text-sm transition-all duration-300",
                                 childActive
-                                  ? "bg-white/10 text-primary-foreground"
-                                  : "text-primary-foreground/70 hover:bg-white/5 hover:text-primary-foreground",
+                                  ? "bg-gradient-to-r from-white/15 to-white/5 text-white ring-1 ring-white/20 shadow-inner"
+                                  : "text-white/80 hover:bg-white/10 hover:text-white",
                               ].join(" ")}
                             >
-                              <span className="absolute inset-0 origin-left scale-x-0 bg-white/[0.04] transition-transform duration-300 group-hover/item:scale-x-100" />
+                              {/* Hover Glow Highlight */}
+                              <span className="absolute inset-0 origin-left scale-x-0 bg-gradient-to-r from-accent/15 via-white/5 to-transparent transition-transform duration-300 group-hover/item:scale-x-100" />
 
+                              {/* Left Golden Accent Indicator */}
                               <span
                                 className={[
-                                  "absolute left-0 inset-y-2 w-[3px]",
-                                  "rounded-r-full bg-accent",
+                                  "absolute left-0 inset-y-1.5 w-[3px]",
+                                  "rounded-r-full bg-accent shadow-[0_0_8px_rgba(200,165,90,0.8)]",
                                   "transition-transform duration-300",
                                   childActive
                                     ? "scale-y-100"
@@ -1258,36 +1298,57 @@ export function Navbar() {
                                 ].join(" ")}
                               />
 
-                              <span
-                                className={[
-                                  "relative z-10 mr-2 text-accent",
-                                  "opacity-0 -translate-x-2",
-                                  "transition-all duration-300",
-                                  "group-hover/item:translate-x-0",
-                                  "group-hover/item:opacity-100",
-                                  childActive
-                                    ? "translate-x-0 opacity-100"
-                                    : "",
-                                ].join(" ")}
-                              >
-                                →
-                              </span>
+                              {/* Icon with elegant frosted badge */}
+                              {Icon && (
+                                <span
+                                  className={[
+                                    "relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                                    "transition-all duration-300",
+                                    childActive
+                                      ? "bg-accent text-slate-900 shadow-md shadow-accent/30 ring-1 ring-accent"
+                                      : "bg-white/10 text-white/90 ring-1 ring-white/15 group-hover/item:bg-accent/20 group-hover/item:text-accent group-hover/item:ring-accent/40",
+                                  ].join(" ")}
+                                >
+                                  <Icon className="h-4 w-4" />
+                                </span>
+                              )}
 
-                              <span
+                              {/* Label & Description */}
+                              <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+                                <span
+                                  className={[
+                                    "font-medium leading-snug transition-transform duration-300",
+                                    "group-hover/item:translate-x-0.5",
+                                    childActive
+                                      ? "font-semibold text-white"
+                                      : "text-white/90",
+                                  ].join(" ")}
+                                >
+                                  {child.label}
+                                </span>
+                                {child.description && (
+                                  <span className="truncate text-[11px] leading-tight text-white/50 group-hover/item:text-white/70">
+                                    {child.description}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Sleek Right Arrow */}
+                              <ArrowRight
                                 className={[
-                                  "relative z-10 transition-transform duration-300",
-                                  "group-hover/item:translate-x-1",
-                                  childActive
-                                    ? "font-semibold text-primary-foreground"
-                                    : "",
+                                  "relative z-10 h-3.5 w-3.5 shrink-0 text-accent",
+                                  "opacity-0 -translate-x-2 transition-all duration-300",
+                                  "group-hover/item:translate-x-0 group-hover/item:opacity-100",
+                                  childActive ? "translate-x-0 opacity-100" : "",
                                 ].join(" ")}
-                              >
-                                {child.label}
-                              </span>
+                              />
                             </Link>
                           );
                         })}
                       </div>
+
+                      {/* Bottom Subtle Gradient Bar */}
+                      <div className="mt-2 h-[1px] w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                     </div>
                   </div>
                 )}
@@ -1379,63 +1440,83 @@ export function Navbar() {
                     ].join(" ")}
                   >
                     <div className="min-h-0">
-                      <div className="flex flex-col gap-1 py-1 pl-4">
-                        {item.children!.map((child, index) => {
-                          const childActive = isChildActive(child);
+                      {/* Mobile Submenu Elegant Card Container */}
+                      <div className="relative my-2 overflow-hidden rounded-xl border border-white/15 bg-gradient-to-b from-[#0c335e] via-[#082444] to-[#05172b] p-2 shadow-xl backdrop-blur-lg">
+                        {/* Decorative Background Elements */}
+                        <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-accent/20 blur-xl" />
+                        <div className="pointer-events-none absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-blue-400/10 blur-xl" />
 
-                          return (
-                            <Link
-                              key={child.label}
-                              href={child.href}
-                              onClick={() => {
-                                setMobileOpen(false);
-                                setMobileSubOpen(null);
-                              }}
-                              style={{
-                                transitionDelay: subOpen
-                                  ? `${index * 45}ms`
-                                  : "0ms",
-                              }}
-                              className={[
-                                "group/mobile-item relative flex items-center",
-                                "overflow-hidden rounded-lg px-4 py-2.5",
-                                "text-sm transition-all duration-300",
-                                childActive
-                                  ? "bg-white/10 font-semibold text-primary-foreground"
-                                  : "text-primary-foreground/70 hover:bg-white/10 hover:text-primary-foreground",
-                              ].join(" ")}
-                            >
-                              <span
-                                className={[
-                                  "absolute left-0 inset-y-1.5 w-[2px]",
-                                  "rounded-full bg-accent",
-                                  "transition-transform duration-300",
-                                  childActive
-                                    ? "scale-y-100"
-                                    : "scale-y-0 group-hover/mobile-item:scale-y-100",
-                                ].join(" ")}
-                              />
+                        {/* Top glowing accent line */}
+                        <div className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-accent to-transparent" />
 
-                              <span
+                        <div className="relative flex flex-col gap-1">
+                          {item.children!.map((child, index) => {
+                            const childActive = isChildActive(child);
+                            const Icon = child.icon;
+
+                            return (
+                              <Link
+                                key={child.label}
+                                href={child.href}
+                                onClick={() => {
+                                  setMobileOpen(false);
+                                  setMobileSubOpen(null);
+                                }}
+                                style={{
+                                  transitionDelay: subOpen
+                                    ? `${index * 35}ms`
+                                    : "0ms",
+                                }}
                                 className={[
-                                  "mr-2 text-accent opacity-0 -translate-x-2",
-                                  "transition-all duration-300",
-                                  "group-hover/mobile-item:translate-x-0",
-                                  "group-hover/mobile-item:opacity-100",
+                                  "group/mobile-item relative flex items-center gap-3",
+                                  "overflow-hidden rounded-lg p-2.5",
+                                  "text-sm transition-all duration-300",
                                   childActive
-                                    ? "translate-x-0 opacity-100"
-                                    : "",
+                                    ? "bg-white/15 font-semibold text-primary-foreground ring-1 ring-white/20"
+                                    : "text-primary-foreground/80 hover:bg-white/10 hover:text-primary-foreground",
                                 ].join(" ")}
                               >
-                                →
-                              </span>
+                                {/* Left Active Bar */}
+                                <span
+                                  className={[
+                                    "absolute left-0 inset-y-1.5 w-[2.5px]",
+                                    "rounded-r-full bg-accent shadow-[0_0_6px_rgba(200,165,90,0.8)]",
+                                    "transition-transform duration-300",
+                                    childActive
+                                      ? "scale-y-100"
+                                      : "scale-y-0 group-hover/mobile-item:scale-y-100",
+                                  ].join(" ")}
+                                />
 
-                              <span className="relative z-10 transition-transform duration-300 group-hover/mobile-item:translate-x-1">
-                                {child.label}
-                              </span>
-                            </Link>
-                          );
-                        })}
+                                {Icon && (
+                                  <span
+                                    className={[
+                                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                                      childActive
+                                        ? "bg-accent text-slate-900 shadow-sm"
+                                        : "bg-white/10 text-white/80 ring-1 ring-white/10",
+                                    ].join(" ")}
+                                  >
+                                    <Icon className="h-4 w-4" />
+                                  </span>
+                                )}
+
+                                <div className="flex min-w-0 flex-1 flex-col">
+                                  <span className="font-medium text-white">
+                                    {child.label}
+                                  </span>
+                                  {child.description && (
+                                    <span className="truncate text-[10px] text-white/50">
+                                      {child.description}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-accent opacity-60" />
+                              </Link>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>

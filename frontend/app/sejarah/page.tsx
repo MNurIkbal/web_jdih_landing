@@ -108,8 +108,23 @@ export default function SejarahPage() {
         </div>
       </section>
 
-      <main className="min-h-screen bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-8 sm:py-20">
+      <main className="relative isolate min-h-screen overflow-hidden bg-gradient-to-b from-slate-50/80 via-slate-100/40 to-slate-50/90 py-14 sm:py-20">
+        {/* Ambient background decoration */}
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div
+            className="absolute inset-0 opacity-[0.035]"
+            style={{
+              backgroundImage:
+                "radial-gradient(#0e3b6e 1px, transparent 1px), radial-gradient(#d4af37 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+              backgroundPosition: "0 0, 16px 16px",
+            }}
+          />
+          <div className="absolute -left-20 top-1/4 h-80 w-80 rounded-full bg-primary/[0.04] blur-3xl" />
+          <div className="absolute -right-20 top-2/3 h-96 w-96 rounded-full bg-accent/[0.06] blur-3xl" />
+        </div>
+
+        <div className="mx-auto max-w-5xl px-6 sm:px-8">
           {isLoading && (
             <div className="flex min-h-[300px] items-center justify-center">
               <p className="text-sm text-slate-400">
@@ -144,22 +159,22 @@ export default function SejarahPage() {
                 [&_h1]:mt-8
                 [&_h1]:text-3xl
                 [&_h1]:font-bold
-                [&_h1]:text-slate-700
+                [&_h1]:text-slate-800
                 [&_h2]:mb-4
                 [&_h2]:mt-8
                 [&_h2]:text-2xl
                 [&_h2]:font-bold
-                [&_h2]:text-slate-700
+                [&_h2]:text-slate-800
                 [&_h3]:mb-3
                 [&_h3]:mt-6
                 [&_h3]:text-xl
                 [&_h3]:font-bold
-                [&_h3]:text-slate-700
+                [&_h3]:text-slate-800
                 [&_h4]:mb-2
                 [&_h4]:mt-5
                 [&_h4]:text-lg
                 [&_h4]:font-semibold
-                [&_h4]:text-slate-700
+                [&_h4]:text-slate-800
                 [&_ul]:my-4
                 [&_ul]:list-disc
                 [&_ul]:pl-8
@@ -170,7 +185,7 @@ export default function SejarahPage() {
                 [&_a]:text-primary
                 [&_a]:underline
                 [&_strong]:font-bold
-                [&_strong]:text-slate-700
+                [&_strong]:text-slate-800
                 [&_blockquote]:my-6
                 [&_blockquote]:border-l-4
                 [&_blockquote]:border-primary

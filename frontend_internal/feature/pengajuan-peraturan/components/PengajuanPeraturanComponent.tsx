@@ -38,6 +38,7 @@ import {
 } from "../hooks/PengajuanPeraturan.hooks";
 import { PengajuanPeraturan, TahapanPeraturan } from "../types/PengajuanPeraturan.type";
 import { APP_BASE_URL } from "@/constanta/GlobalConstanta";
+import { useAdminLayout } from "@/feature/layouts/AdminLayoutContext";
 
 const TAHAPAN_STEPS: { stage: TahapanPeraturan; number: number; label: string; desc: string }[] = [
   { stage: "Pengajuan", number: 1, label: "Pengajuan", desc: "Drafting & Naskah Akademik" },
@@ -48,11 +49,23 @@ const TAHAPAN_STEPS: { stage: TahapanPeraturan; number: number; label: string; d
 ];
 
 export default function PengajuanPeraturanComponent() {
+  const { activeModule } = useAdminLayout();
   const [search, setSearch] = useState("");
-  const [tahapanFilter, setTahapanFilter] = useState("");
+  const [tahapanFilter, setTahapanFilter] = useState(
+    activeModule === "HDH" ? "Harmonisasi" : ""
+  );
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  // Jika berada di modul HDH, otomatis fokus pada tahapan Harmonisasi
+  React.useEffect(() => {
+    if (activeModule === "HDH") {
+      setTahapanFilter("Harmonisasi");
+    } else {
+      setTahapanFilter("");
+    }
+  }, [activeModule]);
 
   const { data, isLoading } = usePengajuanList({
     search,
@@ -68,20 +81,33 @@ export default function PengajuanPeraturanComponent() {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Pengajuan Peraturan
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            {activeModule === "HDH" ? "Harmonisasi Dokumen Hukum (HDH)" : "Pengajuan Peraturan (JDIH)"}
+            <span
+              className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                activeModule === "HDH"
+                  ? "bg-amber-100 text-amber-800 border border-amber-200"
+                  : "bg-blue-100 text-blue-800 border border-blue-200"
+              }`}
+            >
+              Modul {activeModule}
+            </span>
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Sistem Alur Kerja Legislasi Internal BIN: Pengajuan, Pembahasan, Harmonisasi, Persetujuan, hingga Penetapan & Publikasi.
+            {activeModule === "HDH"
+              ? "Modul Khusus Harmonisasi: Penyelarasan materi rancangan hukum dengan peraturan perundang-undangan."
+              : "Modul JDIH: Alur Pembuatan Pengajuan, Pembahasan Rapat, Persetujuan Pejabat, serta Penetapan & Publikasi Dokumen Internal."}
           </p>
         </div>
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-        >
-          <Plus size={18} />
-          Buat Pengajuan Baru
-        </button>
+        {activeModule === "JDIH" && (
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          >
+            <Plus size={18} />
+            Buat Pengajuan Baru
+          </button>
+        )}
       </div>
 
       {/* Stepper Overview Bar */}
@@ -231,6 +257,7 @@ export default function PengajuanPeraturanComponent() {
       {selectedId && (
         <DetailTahapanModal
           draftId={selectedId}
+          activeModule={activeModule}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -273,26 +300,34 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-white overflow-hidden animate-in fade-in duration-200">
+      <div className="flex h-full w-full flex-col">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-8 py-5">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Tahap 1: Pengajuan Rancangan Peraturan
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-blue-600 px-2.5 py-0.5 text-[11px] font-bold text-white uppercase tracking-wider">
+                Modul JDIH
+              </span>
+              <span className="text-xs font-semibold text-slate-500">
+                Tahap 1
+              </span>
+            </div>
+            <h3 className="mt-1 text-xl font-extrabold text-slate-900">
+              Pengajuan Rancangan Peraturan Baru
             </h3>
             <p className="text-xs text-slate-500">
-              Unggah naskah awal dan naskah akademik untuk memulai alur legislasi.
+              Unggah naskah awal dan naskah akademik untuk memulai alur legislasi dokumen hukum.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm"
           >
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 py-6 space-y-5 max-w-5xl mx-auto w-full">
           <div>
             <label className="block text-xs font-semibold text-slate-700">
               Judul Rancangan Peraturan *
@@ -438,19 +473,25 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
 // ================= MODAL DETAIL & 5 TAHAPAN =================
 function DetailTahapanModal({
   draftId,
+  activeModule = "JDIH",
   onClose,
 }: {
   draftId: number;
+  activeModule?: "JDIH" | "HDH";
   onClose: () => void;
 }) {
   const { data: draft, isLoading } = usePengajuanDetail(draftId);
-  const [activeTab, setActiveTab] = useState<TahapanPeraturan>("Pengajuan");
+  const [activeTab, setActiveTab] = useState<TahapanPeraturan>(
+    activeModule === "HDH" ? "Harmonisasi" : "Pengajuan"
+  );
 
   React.useEffect(() => {
-    if (draft?.tahapan) {
+    if (activeModule === "HDH") {
+      setActiveTab("Harmonisasi");
+    } else if (draft?.tahapan) {
       setActiveTab(draft.tahapan);
     }
-  }, [draft?.tahapan]);
+  }, [draft?.tahapan, activeModule]);
 
   if (isLoading || !draft) {
     return (
@@ -462,36 +503,53 @@ function DetailTahapanModal({
     );
   }
 
+  // Filter tahapan berdasarkan modul yang aktif
+  // HDH: khusus tahapan Harmonisasi
+  // JDIH: tahapan Pengajuan, Pembahasan, Persetujuan, Penetapan
+  const visibleSteps =
+    activeModule === "HDH"
+      ? TAHAPAN_STEPS.filter((s) => s.stage === "Harmonisasi")
+      : TAHAPAN_STEPS;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="flex h-[92vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl">
-        {/* Modal Top Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-white overflow-hidden animate-in fade-in duration-200">
+      <div className="flex h-full w-full flex-col">
+        {/* Modal Top Header Fullscreen */}
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-8 py-4">
           <div className="min-w-0 pr-4">
-            <div className="flex items-center gap-2">
-              <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-800">
+            <div className="flex items-center gap-2.5">
+              <span
+                className={`rounded-lg px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
+                  activeModule === "HDH"
+                    ? "bg-amber-600 text-white"
+                    : "bg-blue-600 text-white"
+                }`}
+              >
+                Modul {activeModule}
+              </span>
+              <span className="rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                 {draft.kategori || "Rancangan Peraturan"}
               </span>
-              <span className="text-xs text-slate-400">
-                Tahap Saat Ini: <strong className="text-blue-600">{draft.tahapan}</strong>
+              <span className="text-xs text-slate-500">
+                Tahap Saat Ini: <strong className="text-blue-700">{draft.tahapan}</strong>
               </span>
             </div>
-            <h2 className="mt-1 truncate text-lg font-bold text-slate-900">
+            <h2 className="mt-1 truncate text-xl font-extrabold text-slate-900">
               {draft.judul}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* 5-Stage Stepper Navigation */}
-        <div className="border-b border-slate-100 bg-slate-50/60 px-6 py-3">
-          <div className="flex items-center justify-between gap-2 overflow-x-auto">
-            {TAHAPAN_STEPS.map((step) => {
+        {/* Stepper Navigation */}
+        <div className="border-b border-slate-200 bg-white px-8 py-3 shadow-xs">
+          <div className="flex items-center justify-between gap-3 overflow-x-auto">
+            {visibleSteps.map((step) => {
               const isActive = activeTab === step.stage;
               const isPast =
                 TAHAPAN_STEPS.findIndex((s) => s.stage === draft.tahapan) >=
@@ -501,16 +559,20 @@ function DetailTahapanModal({
                 <button
                   key={step.number}
                   onClick={() => setActiveTab(step.stage)}
-                  className={`flex flex-1 min-w-[150px] items-center gap-2.5 rounded-xl border p-2.5 text-left transition ${
+                  className={`flex flex-1 min-w-[170px] items-center gap-3 rounded-xl border p-3 text-left transition ${
                     isActive
-                      ? "border-blue-600 bg-white text-blue-700 shadow-sm"
-                      : "border-transparent text-slate-500 hover:bg-white/80"
+                      ? activeModule === "HDH"
+                        ? "border-amber-600 bg-amber-50/60 text-amber-800 shadow-sm ring-1 ring-amber-500"
+                        : "border-blue-600 bg-blue-50/60 text-blue-800 shadow-sm ring-1 ring-blue-500"
+                      : "border-slate-200/80 text-slate-500 hover:bg-slate-50"
                   }`}
                 >
                   <div
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
                       isActive
-                        ? "bg-blue-600 text-white"
+                        ? activeModule === "HDH"
+                          ? "bg-amber-600 text-white"
+                          : "bg-blue-600 text-white"
                         : isPast
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-slate-200 text-slate-600"
@@ -536,8 +598,8 @@ function DetailTahapanModal({
           </div>
         </div>
 
-        {/* Stage Content Area */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Stage Content Area Fullscreen */}
+        <div className="flex-1 overflow-y-auto px-8 py-6 max-w-6xl mx-auto w-full">
           {activeTab === "Pengajuan" && <TabPengajuan draft={draft} />}
           {activeTab === "Pembahasan" && <TabPembahasan draft={draft} />}
           {activeTab === "Harmonisasi" && <TabHarmonisasi draft={draft} />}

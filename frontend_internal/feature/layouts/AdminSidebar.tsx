@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, ShieldCheck, PanelLeftClose } from "lucide-react";
+import { X, ShieldCheck, Scale, FileText } from "lucide-react";
 import Image from "next/image";
-import { ADMIN_MENU_ITEMS } from "./adminMenu";
+import { JDIH_MENU_ITEMS, HDH_MENU_ITEMS } from "./adminMenu";
 import { useAdminLayout } from "./AdminLayoutContext";
 
 interface AdminSidebarProps {
@@ -17,12 +17,15 @@ export default function AdminSidebar({
   onClose,
 }: AdminSidebarProps) {
   const pathname = usePathname();
-  const { menuMode, setMenuMode } = useAdminLayout();
+  const { menuMode, activeModule, setActiveModule, isSwitchingModule, switchingTarget } = useAdminLayout();
 
   // Jika mode "navbar" aktif, sidebar disembunyikan/ditiadakan
   if (menuMode === "navbar") {
     return null;
   }
+
+  // Pilih daftar menu berdasarkan modul aktif (JDIH atau HDH)
+  const currentMenuItems = activeModule === "HDH" ? HDH_MENU_ITEMS : JDIH_MENU_ITEMS;
 
   return (
     <>
@@ -77,10 +80,18 @@ export default function AdminSidebar({
 
             <div>
               <div className="text-[17px] font-extrabold tracking-tight text-white flex items-center gap-1.5">
-                JDIH <span className="text-amber-400 font-black">BIN</span>
+                {activeModule === "HDH" ? (
+                  <>
+                    HDH <span className="text-amber-400 font-black">BIN</span>
+                  </>
+                ) : (
+                  <>
+                    JDIH <span className="text-amber-400 font-black">BIN</span>
+                  </>
+                )}
               </div>
               <div className="text-[9.5px] font-semibold uppercase tracking-[0.18em] text-slate-300/80">
-                Admin Portal
+                {activeModule === "HDH" ? "Harmonisasi Dokumen" : "Portal Legislasi"}
               </div>
             </div>
           </Link>
@@ -94,16 +105,90 @@ export default function AdminSidebar({
           </button>
         </div>
 
+        {/* MODUL SWITCHER (HDH vs JDIH) DI ATAS MENU NAVIGATION */}
+        <div className="px-4 pt-4 pb-2">
+          <div className="relative rounded-xl border border-white/15 bg-white/5 p-1 backdrop-blur-md overflow-hidden">
+            {/* Background pill glider */}
+            <div
+              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg transition-all duration-300 ease-out shadow-md ${
+                activeModule === "JDIH"
+                  ? "left-1 bg-gradient-to-r from-blue-600 to-blue-700 shadow-blue-900/50 ring-1 ring-blue-400/50"
+                  : "left-[calc(50%+2px)] bg-gradient-to-r from-amber-600 to-amber-700 shadow-amber-900/50 ring-1 ring-amber-400/50"
+              }`}
+            />
 
-        <nav className="mt-4 flex-1 overflow-y-auto px-3.5 pb-6 custom-scrollbar">
-          <div className="mb-2 px-3">
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400/90">
-              Menu Navigasi
+            <div className="relative z-10 grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => setActiveModule("JDIH")}
+                disabled={isSwitchingModule}
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all duration-200 ${
+                  activeModule === "JDIH"
+                    ? "text-white"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                <FileText
+                  size={14}
+                  className={`transition-transform duration-300 ${
+                    activeModule === "JDIH" ? "scale-110" : "opacity-70"
+                  } ${isSwitchingModule && switchingTarget === "JDIH" ? "animate-bounce" : ""}`}
+                />
+                <span>Modul JDIH</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveModule("HDH")}
+                disabled={isSwitchingModule}
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all duration-200 ${
+                  activeModule === "HDH"
+                    ? "text-white"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                <Scale
+                  size={14}
+                  className={`transition-transform duration-300 ${
+                    activeModule === "HDH" ? "scale-110" : "opacity-70"
+                  } ${isSwitchingModule && switchingTarget === "HDH" ? "animate-bounce" : ""}`}
+                />
+                <span>Modul HDH</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Menu List */}
+        <nav
+          className={`mt-2 flex-1 overflow-y-auto px-3.5 pb-6 custom-scrollbar transition-all duration-300 ${
+            isSwitchingModule
+              ? "opacity-30 translate-y-2 filter blur-[1px] pointer-events-none"
+              : "opacity-100 translate-y-0 filter blur-0"
+          }`}
+        >
+          <div className="mb-2 px-3 flex items-center justify-between transition-colors duration-300">
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400/90 flex items-center gap-1.5">
+              <span
+                className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
+                  activeModule === "HDH" ? "bg-amber-400" : "bg-blue-400"
+                }`}
+              />
+              Navigasi {activeModule}
+            </span>
+            <span
+              className={`text-[9px] font-bold px-2 py-0.5 rounded-full ring-1 transition-all duration-300 ${
+                activeModule === "HDH"
+                  ? "bg-amber-500/20 text-amber-300 ring-amber-400/30"
+                  : "bg-blue-500/20 text-blue-300 ring-blue-400/30"
+              }`}
+            >
+              {activeModule === "HDH" ? "Harmonisasi" : "Regulasi"}
             </span>
           </div>
 
           <div className="space-y-1">
-            {ADMIN_MENU_ITEMS.map((item) => {
+            {currentMenuItems.map((item, index) => {
               const Icon = item.icon;
               const active =
                 item.href === "/admin"
@@ -116,6 +201,9 @@ export default function AdminSidebar({
                   key={item.href}
                   href={item.href}
                   onClick={onClose}
+                  style={{
+                    animationDelay: `${index * 40}ms`,
+                  }}
                   className={`
                     group relative flex items-center
                     gap-3 rounded-xl px-3 py-2.5
@@ -123,7 +211,9 @@ export default function AdminSidebar({
                     transition-all duration-200
                     ${
                       active
-                        ? "bg-gradient-to-r from-blue-600/90 to-blue-700/80 text-white shadow-md shadow-blue-900/30 ring-1 ring-blue-400/40"
+                        ? activeModule === "HDH"
+                          ? "bg-gradient-to-r from-amber-600/90 to-amber-700/80 text-white shadow-md ring-1 ring-amber-400/40"
+                          : "bg-gradient-to-r from-blue-600/90 to-blue-700/80 text-white shadow-md shadow-blue-900/30 ring-1 ring-blue-400/40"
                         : "text-slate-300 hover:bg-white/10 hover:text-white"
                     }
                   `}
@@ -169,7 +259,7 @@ export default function AdminSidebar({
                 Badan Intelijen Negara
               </p>
               <p className="truncate text-[9.5px] text-slate-400">
-                Sistem JDIH Terenkripsi
+                {activeModule === "HDH" ? "Harmonisasi Dokumen Hukum" : "Sistem JDIH Terenkripsi"}
               </p>
             </div>
           </div>

@@ -34,7 +34,7 @@ const WIDTH_CLASS = {
   lg: "max-w-lg",
   xl: "max-w-xl",
   "2xl": "max-w-2xl",
-  full: "max-w-none",
+  full: "max-w-2xl lg:max-w-3xl",
 };
 
 export default function Drawer({

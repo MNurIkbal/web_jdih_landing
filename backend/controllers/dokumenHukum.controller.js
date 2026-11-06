@@ -1,5 +1,9 @@
+const fs = require("fs");
+const path = require("path");
+const jwt = require("jsonwebtoken");
 const dokumenHukumService =
     require("../services/dokumenHukum.service");
+const { applyWatermark } = require("../utils/pdfWatermark");
 
 const getAll = async (req, res) => {
     try {
@@ -506,6 +510,77 @@ const controlDownload = async (req, res) => {
     }
 };
 
+const downloadWatermarkedFile = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const dokumen = await dokumenHukumService.getById(id);
+
+        if (!dokumen || !dokumen.file_dokumen) {
+            return res.status(404).json({
+                success: false,
+                message: "File dokumen hukum tidak ditemukan",
+            });
+        }
+
+        // Tentukan nama pengunduh: hanya ambil nama jika login; jika tidak login kosongkan
+        let userName = req.query.nama || req.query.userName || "";
+        if (!userName && req.cookies?.access_token) {
+            try {
+                const decoded = jwt.verify(req.cookies.access_token, process.env.JWT_SECRET);
+                userName = decoded?.nama || decoded?.name || decoded?.email || "";
+            } catch (e) {
+                // Token tidak valid atau tidak login
+                userName = "";
+            }
+        }
+
+        // Lokasi file PDF di uploads/dokumen-hukum
+        const rawFileName = path.basename(dokumen.file_dokumen);
+        const filePath = path.join(process.cwd(), "uploads", "dokumen-hukum", rawFileName);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                success: false,
+                message: "File fisik dokumen tidak ditemukan di server",
+            });
+        }
+
+        // Update counter download
+        try {
+            await dokumenHukumService.serviceDownload(id);
+        } catch (e) {
+            console.error("Gagal update counter download:", e);
+        }
+
+        // Watermark PDF
+        const watermarkedBuffer = await applyWatermark(filePath, {
+            userName: userName,
+            downloadDate: new Date(),
+        });
+
+        // Buat nama file unduhan yang rapi
+        const cleanJudul = (dokumen.judul || "dokumen-hukum")
+            .replace(/[/\\?%*:|"<>]/g, "-")
+            .slice(0, 100);
+        const downloadFilename = `${cleanJudul}.pdf`;
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${encodeURIComponent(downloadFilename)}"`
+        );
+        res.setHeader("Content-Length", watermarkedBuffer.length);
+
+        return res.send(watermarkedBuffer);
+    } catch (error) {
+        console.error("downloadWatermarkedFile error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Gagal memproses unduhan dokumen dengan watermark: " + error.message,
+        });
+    }
+};
+
 const controlPreview = async (req, res) => {
     try {
         const { id } = req.params;
@@ -543,5 +618,6 @@ module.exports = {
     getAllWeb,
     getRelated,
     controlDownload,
-    controlPreview
+    controlPreview,
+    downloadWatermarkedFile,
 };

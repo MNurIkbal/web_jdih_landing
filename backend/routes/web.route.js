@@ -30,6 +30,7 @@ router.get("/dokumen-hukum-pagination", dokumenHukumController.getAllWeb);
 router.get("/dokumen-hukum/:id", dokumenHukumController.getById);
 router.get("/dokumen-hukum/:id/related", dokumenHukumController.getRelated);
 router.post("/dokumen-hukum/:id/download", dokumenHukumController.controlDownload);
+router.get("/dokumen-hukum/:id/download-file", dokumenHukumController.downloadWatermarkedFile);
 router.post("/dokumen-hukum/:id/preview", dokumenHukumController.controlPreview);
 
 // kontak
@@ -44,6 +45,7 @@ const surveyController = require("../controllers/survey.controller");
 // survey layanan publik
 router.get("/survey/pertanyaan", surveyController.getPublicPertanyaan);
 router.post("/survey/submit", surveyController.submitPublicJawaban);
+router.get("/survey/statistik", surveyController.getStatistik);
 
 const pengunjungController = require("../controllers/pengunjung.controller");
 

@@ -74,17 +74,18 @@ export default function Drawer({
 
       <aside
         className={`
-          fixed right-0 top-0 z-[70]
-          flex h-screen w-full
+          fixed right-0 top-0 bottom-0 z-[70]
+          flex h-screen max-h-screen w-full
           ${WIDTH_CLASS[width]}
           flex-col
           bg-white
-          shadow-[-20px_0_60px_rgba(15,23,42,0.12)]
+          shadow-[-20px_0_60px_rgba(15,23,42,0.18)]
           transition-transform
           duration-300
           ease-out
           ${open ? "translate-x-0" : "translate-x-full"}
         `}
+        style={{ height: "100vh", maxHeight: "100dvh" }}
       >
         <div
           className="
@@ -141,6 +142,7 @@ export default function Drawer({
             min-h-0
             flex-1
             flex-col
+            overflow-hidden
           "
         >
           <div
@@ -149,7 +151,8 @@ export default function Drawer({
               flex-1
               px-6
               py-6
-              ${scrollable ? "overflow-y-auto" : "overflow-hidden"}
+              pb-12
+              ${scrollable ? "overflow-y-auto custom-scrollbar" : "overflow-hidden"}
             `}
           >
             {children}

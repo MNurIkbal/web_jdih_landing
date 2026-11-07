@@ -1,5 +1,9 @@
 const pengajuanRepo = require("../repositories/pengajuanPeraturan.repository");
 
+const getOptions = async (params) => {
+    return await pengajuanRepo.getOptions(params);
+};
+
 const getAll = async (params) => {
     return await pengajuanRepo.findAll(params);
 };
@@ -59,6 +63,7 @@ const remove = async (id) => {
 };
 
 module.exports = {
+    getOptions,
     getAll,
     getById,
     create,

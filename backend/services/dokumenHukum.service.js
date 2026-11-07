@@ -5,6 +5,7 @@ const getAll = async ({
     search = "",
     page = 1,
     size = 10,
+    status = "",
 } = {}) => {
     page = Number(page);
     size = Number(size);
@@ -32,6 +33,7 @@ const getAll = async ({
             search,
             page,
             size,
+            status,
         });
 
     const totalPages =

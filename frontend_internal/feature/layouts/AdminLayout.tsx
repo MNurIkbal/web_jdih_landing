@@ -73,7 +73,7 @@ function AdminLayoutInner({ children }: AdminLayoutWrapperProps) {
       <div
         className={`w-full overflow-x-hidden transition-all duration-300 ${
           menuMode === "sidebar" ? "lg:pl-[275px]" : "pl-0"
-        } ${isSwitchingModule ? "opacity-50 scale-[0.99] filter blur-[0.5px]" : "opacity-100 scale-100 filter blur-0"}`}
+        } ${isSwitchingModule ? "opacity-50" : "opacity-100"}`}
       >
         <AdminNavbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="w-full overflow-x-hidden">{children}</main>

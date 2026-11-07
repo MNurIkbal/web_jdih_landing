@@ -1,22 +1,17 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   FileText,
   Plus,
-  Search,
-  Filter,
   CheckCircle2,
   Clock,
-  AlertCircle,
   FileCheck,
   ChevronRight,
   ArrowRight,
   X,
   Upload,
-  Calendar,
-  Users,
-  ShieldAlert,
   Send,
   Trash2,
   ExternalLink,
@@ -31,6 +26,7 @@ import {
   useDeletePejabatPersetujuan,
   useDeletePembahasanRapat,
   useDeletePengajuan,
+  useMasterOptions,
   usePengajuanDetail,
   usePengajuanList,
   useSubmitHarmonisasi,
@@ -39,8 +35,24 @@ import {
   useUpdateTahapanPengajuan,
 } from "../hooks/PengajuanPeraturan.hooks";
 import { PengajuanPeraturan, TahapanPeraturan } from "../types/PengajuanPeraturan.type";
-import { APP_BASE_URL } from "@/constanta/GlobalConstanta";
+import {
+  APP_BASE_URL,
+  kategoriOptions,
+  tipeDokumenOptions,
+  bidangOptions,
+  subjectOptions,
+  tahunOptions,
+  statusOptions,
+} from "@/constanta/GlobalConstanta";
 import { useAdminLayout } from "@/feature/layouts/AdminLayoutContext";
+import { toast } from "sonner";
+import FormDatePicker from "@/components/ui/FormDatePicker";
+import FormSelectSearch, { type SelectSearchOption } from "@/components/ui/FormSelectSearch";
+import {
+  PengajuanPeraturanSchema,
+  type PengajuanPeraturanFormValues,
+} from "../schema/PengajuanPeraturan.schema";
+import { fetchDokumenHukum } from "@/feature/dokumen-hukum/api/DokumenHukum.service";
 
 const TAHAPAN_STEPS: { stage: TahapanPeraturan; number: number; label: string; desc: string }[] = [
   { stage: "Pengajuan", number: 1, label: "Pengajuan", desc: "Drafting & Naskah Akademik" },
@@ -81,7 +93,7 @@ export default function PengajuanPeraturanComponent() {
     size,
   });
 
-  const items: PengajuanPeraturan[] = data?.data || [];
+  const items: PengajuanPeraturan[] = (data as any)?.data || [];
   const totalElements = (data as any)?.totalItems || items.length;
   const totalPages = (data as any)?.totalPages || Math.ceil(totalElements / size) || 1;
 
@@ -237,7 +249,7 @@ export default function PengajuanPeraturanComponent() {
         data={items}
         columns={columns}
         getRowId={(row) => row.id}
-        title={activeModule === "HDH" ? "Harmonisasi Dokumen Hukum (HDH)" : "Pengajuan Peraturan (JDIH)"}
+        title={activeModule === "HDH" ? "Harmonisasi Dokumen Hukum" : "Pengajuan Peraturan"}
         description={
           activeModule === "HDH"
             ? "Penyelarasan & harmonisasi materi rancangan hukum dengan peraturan perundang-undangan."
@@ -316,20 +328,153 @@ export default function PengajuanPeraturanComponent() {
 // ================= MODAL BUAT PENGAJUAN BARU =================
 function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
   const { mutate: createDraft, isPending } = useCreatePengajuan();
+  const [mounted, setMounted] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  // Form State (Default kosong semua)
   const [judul, setJudul] = useState("");
-  const [kategori, setKategori] = useState("Rancangan Peraturan Kepala Lembaga");
+  const [kategori, setKategori] = useState("");
   const [nomorRancangan, setNomorRancangan] = useState("");
-  const [tahun, setTahun] = useState(new Date().getFullYear().toString());
+  const [tahun, setTahun] = useState("");
+  const [tipeDokumen, setTipeDokumen] = useState("");
+  const [bidang, setBidang] = useState("");
+
+  const [tempatPenetapan, setTempatPenetapan] = useState("");
+  const [tanggalPengajuan, setTanggalPengajuan] = useState("");
+  const [targetPenetapan, setTargetPenetapan] = useState("");
+  const [sumber, setSumber] = useState("");
+  const [subject, setSubject] = useState("");
+
   const [pemrakarsa, setPemrakarsa] = useState("");
   const [penanggungJawab, setPenanggungJawab] = useState("");
   const [ringkasan, setRingkasan] = useState("");
+
+  // Upload berkas & preview
   const [fileDraft, setFileDraft] = useState<File | null>(null);
   const [fileNaskah, setFileNaskah] = useState<File | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfTitle, setPreviewPdfTitle] = useState<string>("");
+
+  // Form Validation Errors State
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Clean object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
+    };
+  }, [previewPdfUrl]);
+
+  // Options converters
+  const kategoriSelectOptions: SelectSearchOption[] = useMemo(
+    () =>
+      kategoriOptions
+        .filter((o) => o.value)
+        .map((o) => ({ value: o.value, label: o.label })),
+    []
+  );
+
+  const tipeDokumenSelectOptions: SelectSearchOption[] = useMemo(
+    () =>
+      tipeDokumenOptions.map((o) => ({
+        value: o.value,
+        label: o.label,
+      })),
+    []
+  );
+
+  const bidangSelectOptions: SelectSearchOption[] = useMemo(
+    () =>
+      bidangOptions.map((o) => ({
+        value: o.value,
+        label: o.label,
+      })),
+    []
+  );
+
+  const subjectSelectOptions: SelectSearchOption[] = useMemo(
+    () =>
+      subjectOptions.map((o) => ({
+        value: o.value,
+        label: o.label,
+      })),
+    []
+  );
+
+  // Search API for Referensi Dokumen / Produk Hukum
+  const handleSearchDokumenApi = async (query: string): Promise<SelectSearchOption[]> => {
+    try {
+      const res = await fetchDokumenHukum({ search: query, page: 0, size: 8 });
+      const items = res?.content || (res as any)?.data || [];
+      return items.map((doc: any) => ({
+        value: doc.judul,
+        label: doc.judul,
+        subLabel: `${doc.kategori || "Dokumen"} • No ${doc.nomor || "-"} • Tahun ${doc.tahun || "-"}`,
+      }));
+    } catch {
+      return [];
+    }
+  };
+
+  // Open Preview PDF in modal
+  const handleOpenPdfPreview = (file: File | null, title: string) => {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast.info("Pratinjau langsung hanya tersedia untuk format PDF.");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewPdfUrl(url);
+    setPreviewPdfTitle(title);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!judul.trim()) return;
+
+    // Validasi Zod Schema
+    const validation = PengajuanPeraturanSchema.safeParse({
+      judul,
+      kategori,
+      tipe_dokumen: tipeDokumen,
+      nomor_rancangan: nomorRancangan,
+      tahun,
+      bidang,
+      subject,
+      tempat_penetapan: tempatPenetapan,
+      tanggal_pengajuan: tanggalPengajuan,
+      target_penetapan: targetPenetapan,
+      pemrakarsa,
+      penanggung_jawab: penanggungJawab,
+      sumber,
+      ringkasan,
+      file_draft: fileDraft,
+      file_naskah_akademik: fileNaskah,
+    });
+
+    if (!validation.success) {
+      const formattedErrors: Record<string, string> = {};
+      validation.error.issues.forEach((issue) => {
+        const fieldName = String(issue.path[0]);
+        formattedErrors[fieldName] = issue.message;
+      });
+      setFormErrors(formattedErrors);
+
+      const firstError = Object.values(formattedErrors)[0];
+      if (firstError) {
+        toast.error(firstError);
+      }
+      return;
+    }
+
+    setFormErrors({});
 
     const fd = new FormData();
     fd.append("judul", judul);
@@ -338,7 +483,21 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
     fd.append("tahun", tahun);
     fd.append("pemrakarsa", pemrakarsa);
     fd.append("penanggung_jawab", penanggungJawab);
-    fd.append("ringkasan", ringkasan);
+    fd.append("tanggal_pengajuan", tanggalPengajuan);
+    if (targetPenetapan) fd.append("target_penetapan", targetPenetapan);
+
+    const fullRingkasan = [
+      ringkasan,
+      `[Tipe: ${tipeDokumen}]`,
+      `[Bidang: ${bidang}]`,
+      `[Tempat Penetapan: ${tempatPenetapan}]`,
+      sumber ? `[Sumber: ${sumber}]` : "",
+      subject ? `[Subjek: ${subject}]` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    fd.append("ringkasan", fullRingkasan);
     if (fileDraft) fd.append("file_draft", fileDraft);
     if (fileNaskah) fd.append("file_naskah_akademik", fileNaskah);
 
@@ -347,174 +506,486 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
     });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-white overflow-hidden animate-in fade-in duration-200">
-      <div className="flex h-full w-full flex-col">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-8 py-5">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-white overflow-hidden">
+      {/* Header Modal Fullscreen */}
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 py-5 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+            <FileText size={24} />
+          </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded-lg bg-blue-600 px-2.5 py-0.5 text-[11px] font-bold text-white uppercase tracking-wider">
-                Modul JDIH
-              </span>
-              <span className="text-xs font-semibold text-slate-500">
-                Tahap 1
-              </span>
             </div>
             <h3 className="mt-1 text-xl font-extrabold text-slate-900">
-              Pengajuan Rancangan Peraturan Baru
+              Pengajuan Rancangan Dokumen Hukum
             </h3>
             <p className="text-xs text-slate-500">
-              Unggah naskah awal dan naskah akademik untuk memulai alur legislasi dokumen hukum.
+              Silahkan Lengkap form di bawah ini 
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm"
-          >
-            <X size={20} />
-          </button>
         </div>
+        <button
+          onClick={onClose}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm cursor-pointer"
+        >
+          <X size={20} />
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 py-6 space-y-5 max-w-5xl mx-auto w-full">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Judul Rancangan Peraturan *
-            </label>
-            <input
-              type="text"
-              required
-              value={judul}
-              onChange={(e) => setJudul(e.target.value)}
-              placeholder="Contoh: Rancangan Peraturan Kepala BIN tentang Pedoman Keamanan Informasi"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Kategori
-              </label>
-              <select
-                value={kategori}
-                onChange={(e) => setKategori(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              >
-                <option value="Rancangan Peraturan Kepala Lembaga">Rancangan Peraturan Kepala Lembaga</option>
-                <option value="Rancangan Peraturan Bersama">Rancangan Peraturan Bersama</option>
-                <option value="Rancangan Keputusan">Rancangan Keputusan</option>
-                <option value="Rancangan Instruksi">Rancangan Instruksi</option>
-              </select>
+      {/* Form Body - Full Width & Scrollbar di pojok kanan layar */}
+      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar">
+        <div className="w-full px-6 sm:px-10 lg:px-16 py-8 space-y-8">
+          {/* Section 1: Informasi Utama */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
+            <div className="border-b border-slate-100 pb-3">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
+                Informasi Utama Dokumen Hukum
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">Identitas rancangan peraturan yang akan diajukan</p>
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Nomor Rancangan
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Judul Rancangan Dokumen Hukum <span className="text-rose-500 ml-1">*</span>
               </label>
               <input
                 type="text"
-                value={nomorRancangan}
-                onChange={(e) => setNomorRancangan(e.target.value)}
-                placeholder="Contoh: R-01/PER/2026"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                value={judul}
+                onChange={(e) => {
+                  setJudul(e.target.value);
+                  if (formErrors.judul) {
+                    setFormErrors((prev) => ({ ...prev, judul: "" }));
+                  }
+                }}
+                placeholder="Contoh: Peraturan Kepala Badan Intelijen Negara tentang Sistem Tata Kelola Keamanan Informasi"
+                className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none transition ${
+                  formErrors.judul
+                    ? "border-rose-400 ring-2 ring-rose-100"
+                    : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                }`}
+              />
+              {formErrors.judul && (
+                <p className="text-xs text-rose-500 mt-1">{formErrors.judul}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <FormSelectSearch
+                  label="Kategori Dokumen"
+                  required
+                  value={kategori}
+                  onChange={(val) => {
+                    setKategori(val);
+                    if (formErrors.kategori) setFormErrors((prev) => ({ ...prev, kategori: "" }));
+                  }}
+                  options={kategoriSelectOptions}
+                  error={formErrors.kategori}
+                  placeholder="Pilih kategori..."
+                  searchPlaceholder="Cari kategori..."
+                />
+              </div>
+
+              <div>
+                <FormSelectSearch
+                  label="Tipe Dokumen Hukum"
+                  required
+                  value={tipeDokumen}
+                  onChange={(val) => {
+                    setTipeDokumen(val);
+                    if (formErrors.tipe_dokumen) setFormErrors((prev) => ({ ...prev, tipe_dokumen: "" }));
+                  }}
+                  options={tipeDokumenSelectOptions}
+                  error={formErrors.tipe_dokumen}
+                  placeholder="Pilih tipe dokumen..."
+                  searchPlaceholder="Cari tipe dokumen..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Nomor Rancangan
+                </label>
+                <input
+                  type="text"
+                  value={nomorRancangan}
+                  onChange={(e) => setNomorRancangan(e.target.value)}
+                  placeholder="Contoh: R-01/PER/2026"
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Tahun <span className="text-rose-500 ml-1">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={tahun}
+                  placeholder="Contoh: 2026"
+                  onChange={(e) => {
+                    setTahun(e.target.value);
+                    if (formErrors.tahun) setFormErrors((prev) => ({ ...prev, tahun: "" }));
+                  }}
+                  className={`mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none transition ${
+                    formErrors.tahun
+                      ? "border-rose-400 ring-2 ring-rose-100"
+                      : "border-slate-200 focus:border-blue-500"
+                  }`}
+                />
+                {formErrors.tahun && (
+                  <p className="text-xs text-rose-500 mt-1">{formErrors.tahun}</p>
+                )}
+              </div>
+
+              <div>
+                <FormSelectSearch
+                  label="Bidang Hukum"
+                  required
+                  value={bidang}
+                  onChange={(val) => {
+                    setBidang(val);
+                    if (formErrors.bidang) setFormErrors((prev) => ({ ...prev, bidang: "" }));
+                  }}
+                  options={bidangSelectOptions}
+                  error={formErrors.bidang}
+                  placeholder="Pilih bidang..."
+                  searchPlaceholder="Cari bidang hukum..."
+                />
+              </div>
+
+              <div>
+                <FormSelectSearch
+                  label="Subjek Hukum"
+                  required
+                  value={subject}
+                  onChange={(val) => {
+                    setSubject(val);
+                    if (formErrors.subject) setFormErrors((prev) => ({ ...prev, subject: "" }));
+                  }}
+                  options={subjectSelectOptions}
+                  error={formErrors.subject}
+                  placeholder="Pilih subjek..."
+                  searchPlaceholder="Cari subjek hukum..."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Penetapan & Unit Pemrakarsa */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
+            <div className="border-b border-slate-100 pb-3">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
+                Penetapan & Unit Pemrakarsa
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">Data tempat, tanggal pengajuan, serta penanggung jawab perumusan</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Tempat Penetapan
+                </label>
+                <input
+                  type="text"
+                  value={tempatPenetapan}
+                  onChange={(e) => setTempatPenetapan(e.target.value)}
+                  placeholder="Contoh: Jakarta"
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              <div>
+                <FormDatePicker
+                  label="Tanggal Pengajuan"
+                  required
+                  value={tanggalPengajuan}
+                  onChange={(d) => {
+                    setTanggalPengajuan(d);
+                    if (formErrors.tanggal_pengajuan) setFormErrors((prev) => ({ ...prev, tanggal_pengajuan: "" }));
+                  }}
+                  error={formErrors.tanggal_pengajuan}
+                  placeholder="Pilih tanggal pengajuan..."
+                />
+              </div>
+
+              <div>
+                <FormDatePicker
+                  label="Target Penetapan"
+                  value={targetPenetapan}
+                  onChange={(d) => setTargetPenetapan(d)}
+                  placeholder="Pilih target tanggal penetapan..."
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Unit Pemrakarsa <span className="text-rose-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={pemrakarsa}
+                  onChange={(e) => {
+                    setPemrakarsa(e.target.value);
+                    if (formErrors.pemrakarsa) setFormErrors((prev) => ({ ...prev, pemrakarsa: "" }));
+                  }}
+                  placeholder="Contoh: Biro Hukum BIN"
+                  className={`mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none transition ${
+                    formErrors.pemrakarsa
+                      ? "border-rose-400 ring-2 ring-rose-100"
+                      : "border-slate-200 focus:border-blue-500"
+                  }`}
+                />
+                {formErrors.pemrakarsa && (
+                  <p className="text-xs text-rose-500 mt-1">{formErrors.pemrakarsa}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Penanggung Jawab Perumusan
+                </label>
+                <input
+                  type="text"
+                  value={penanggungJawab}
+                  onChange={(e) => setPenanggungJawab(e.target.value)}
+                  placeholder="Contoh: Direktur Regulasi Keamanan"
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              <div>
+                {/* Select Search dengan integrasi API Dokumen Hukum */}
+                <FormSelectSearch
+                  label="Referensi / Sumber Dokumen Terkait"
+                  value={sumber}
+                  onChange={(val) => setSumber(val)}
+                  onSearchApi={handleSearchDokumenApi}
+                  placeholder="Ketik untuk mencari referensi dokumen..."
+                  searchPlaceholder="Ketik judul dokumen perundang-undangan..."
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Ringkasan / Latar Belakang Urgensi
+              </label>
+              <textarea
+                rows={3}
+                value={ringkasan}
+                onChange={(e) => setRingkasan(e.target.value)}
+                placeholder="Uraikan latar belakang perlunya penyusunan regulasi ini..."
+                className="mt-1.5 w-full rounded-xl border border-slate-200 p-3.5 text-sm focus:border-blue-500 focus:outline-none transition"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Tahun
-              </label>
-              <input
-                type="number"
-                value={tahun}
-                onChange={(e) => setTahun(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
+          {/* Section 3: Berkas Dokumen & Naskah Akademik dengan Preview */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
+            <div className="border-b border-slate-100 pb-3">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
+                Upload Berkas Dokumen & Pratinjau (Preview PDF)
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">Unggah draft naskah regulasi dan naskah akademik penunjang. Anda dapat melihat pratinjau PDF langsung sebelum menyimpan.</p>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Unit Pemrakarsa
-              </label>
-              <input
-                type="text"
-                value={pemrakarsa}
-                onChange={(e) => setPemrakarsa(e.target.value)}
-                placeholder="Contoh: Biro Hukum BIN"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Penanggung Jawab
-              </label>
-              <input
-                type="text"
-                value={penanggungJawab}
-                onChange={(e) => setPenanggungJawab(e.target.value)}
-                placeholder="Contoh: Direktur Regulasi"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {/* Draft Naskah */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Draft Naskah Regulasi <span className="text-rose-500 ml-1">*</span>
+                </label>
+                <div
+                  className={`rounded-2xl border-2 border-dashed p-6 text-center transition ${
+                    formErrors.file_draft
+                      ? "border-rose-400 bg-rose-50/20"
+                      : "border-slate-200 bg-slate-50/60 hover:border-blue-400 hover:bg-blue-50/30"
+                  }`}
+                >
+                  <input
+                    type="file"
+                    id="file-draft-input"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      setFileDraft(f);
+                      if (formErrors.file_draft) setFormErrors((prev) => ({ ...prev, file_draft: "" }));
+                    }}
+                  />
+                  <label htmlFor="file-draft-input" className="cursor-pointer block">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 mx-auto mb-3">
+                      <Upload size={22} />
+                    </div>
+                    {fileDraft ? (
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 line-clamp-1">{fileDraft.name}</p>
+                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                          Berkas terpilih ({(fileDraft.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">Pilih Berkas Draft (PDF/DOC)</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Maksimal ukuran file 50 MB</p>
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Tombol Preview PDF jika file draft sudah dipilih */}
+                  {fileDraft && (
+                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPdfPreview(fileDraft, `Preview Draft: ${fileDraft.name}`)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition cursor-pointer"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Pratinjau PDF</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFileDraft(null)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                        <span>Hapus</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {formErrors.file_draft && (
+                  <p className="text-xs text-rose-500 mt-1.5">{formErrors.file_draft}</p>
+                )}
+              </div>
+
+              {/* Naskah Akademik */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                  Naskah Akademik / Kajian Hukum
+                </label>
+                <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 p-6 text-center hover:border-amber-400 hover:bg-amber-50/30 transition">
+                  <input
+                    type="file"
+                    id="file-naskah-input"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => setFileNaskah(e.target.files?.[0] || null)}
+                  />
+                  <label htmlFor="file-naskah-input" className="cursor-pointer block">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700 mx-auto mb-3">
+                      <BookOpen size={22} />
+                    </div>
+                    {fileNaskah ? (
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 line-clamp-1">{fileNaskah.name}</p>
+                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                          Berkas terpilih ({(fileNaskah.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">Pilih Naskah Akademik (PDF/DOC)</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Opsional, jika naskah akademik tersedia</p>
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Tombol Preview PDF jika naskah akademik dipilih */}
+                  {fileNaskah && (
+                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPdfPreview(fileNaskah, `Preview Naskah Akademik: ${fileNaskah.name}`)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Pratinjau PDF</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFileNaskah(null)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                        <span>Hapus</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Ringkasan / Latar Belakang
-            </label>
-            <textarea
-              rows={3}
-              value={ringkasan}
-              onChange={(e) => setRingkasan(e.target.value)}
-              placeholder="Uraikan ringkasan materi muatan urgensi rancangan..."
-              className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Upload File Draft Rancangan (PDF/DOC)
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => setFileDraft(e.target.files?.[0] || null)}
-                className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Upload File Naskah Akademik (PDF/DOC)
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => setFileNaskah(e.target.files?.[0] || null)}
-                className="mt-1 block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+          {/* Action Footer */}
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-6 pb-8">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              disabled={isPending}
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-95 disabled:opacity-50 transition cursor-pointer"
             >
-              {isPending ? "Menyimpan..." : "Simpan & Lanjutkan"}
+              <FileCheck size={16} />
+              {isPending ? "Menyimpan Draft..." : "Simpan Pengajuan (Draft)"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+
+      {/* Modal Preview PDF Instan */}
+      {previewPdfUrl && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 sm:p-6 lg:p-10 animate-in fade-in duration-200">
+          <div className="flex flex-col h-full w-full max-w-5xl rounded-3xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 truncate max-w-lg">
+                    {previewPdfTitle}
+                  </h4>
+                  <p className="text-[11px] text-slate-500">Pratinjau dokumen sebelum berkas diunggah dan disimpan</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewPdfUrl(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 w-full bg-slate-100">
+              <iframe
+                src={previewPdfUrl}
+                className="w-full h-full border-none"
+                title="Preview PDF"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
   );
 }
 
@@ -532,6 +1003,16 @@ function DetailTahapanModal({
   const [activeTab, setActiveTab] = useState<TahapanPeraturan>(
     activeModule === "HDH" ? "Harmonisasi" : "Pengajuan"
   );
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (activeModule === "HDH") {
@@ -541,13 +1022,16 @@ function DetailTahapanModal({
     }
   }, [draft?.tahapan, activeModule]);
 
+  if (!mounted) return null;
+
   if (isLoading || !draft) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+    return createPortal(
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
         <div className="rounded-2xl bg-white p-8 text-center text-sm font-semibold text-slate-600 shadow-xl">
           Memuat data pengajuan peraturan...
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -559,11 +1043,11 @@ function DetailTahapanModal({
       ? TAHAPAN_STEPS.filter((s) => s.stage === "Harmonisasi")
       : TAHAPAN_STEPS;
 
-  return (
-    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-white overflow-hidden animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-white overflow-hidden">
       <div className="flex h-full w-full flex-col">
         {/* Modal Top Header Fullscreen */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-8 py-4">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4 shadow-xs">
           <div className="min-w-0 pr-4">
             <div className="flex items-center gap-2.5">
               <span
@@ -588,7 +1072,7 @@ function DetailTahapanModal({
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -607,7 +1091,7 @@ function DetailTahapanModal({
                 <button
                   key={step.number}
                   onClick={() => setActiveTab(step.stage)}
-                  className={`flex flex-1 min-w-[170px] items-center gap-3 rounded-xl border p-3 text-left transition ${
+                  className={`flex flex-1 min-w-[170px] items-center gap-3 rounded-xl border p-3 text-left transition cursor-pointer ${
                     isActive
                       ? activeModule === "HDH"
                         ? "border-amber-600 bg-amber-50/60 text-amber-800 shadow-sm ring-1 ring-amber-500"
@@ -646,30 +1130,84 @@ function DetailTahapanModal({
           </div>
         </div>
 
-        {/* Stage Content Area Fullscreen */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 max-w-6xl mx-auto w-full">
-          {activeTab === "Pengajuan" && <TabPengajuan draft={draft} />}
-          {activeTab === "Pembahasan" && <TabPembahasan draft={draft} />}
-          {activeTab === "Harmonisasi" && <TabHarmonisasi draft={draft} />}
-          {activeTab === "Persetujuan" && <TabPersetujuan draft={draft} />}
-          {activeTab === "Penetapan" && <TabPenetapan draft={draft} onClose={onClose} />}
+        {/* Stage Content Area Fullscreen - Full width & scrollbar di pojok kanan layar */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar">
+          <div className="w-full px-6 sm:px-10 lg:px-16 py-8">
+            {activeTab === "Pengajuan" && (
+              <TabPengajuan
+                draft={draft}
+                onNext={() => setActiveTab("Pembahasan")}
+              />
+            )}
+            {activeTab === "Pembahasan" && <TabPembahasan draft={draft} />}
+            {activeTab === "Harmonisasi" && <TabHarmonisasi draft={draft} />}
+            {activeTab === "Persetujuan" && <TabPersetujuan draft={draft} />}
+            {activeTab === "Penetapan" && <TabPenetapan draft={draft} onClose={onClose} />}
+          </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 // ------------------- TAHAP 1: PENGAJUAN VIEW -------------------
-function TabPengajuan({ draft }: { draft: PengajuanPeraturan }) {
+function TabPengajuan({
+  draft,
+  onNext,
+}: {
+  draft: PengajuanPeraturan;
+  onNext?: () => void;
+}) {
+  const { mutate: updateTahap, isPending } = useUpdateTahapanPengajuan();
+
+  const handleKirimKeVerifikator = () => {
+    updateTahap(
+      {
+        id: draft.id,
+        payload: {
+          tahapan: "Pembahasan",
+          status: "Proses",
+        },
+      },
+      {
+        onSuccess: () => {
+          if (onNext) onNext();
+        },
+      }
+    );
+  };
+
+  const isSudahLanjut = draft.tahapan !== "Pengajuan";
+
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-        <h4 className="text-sm font-bold text-blue-900">
-          Tahap 1: Pengajuan & Dokumen Rancangan
-        </h4>
-        <p className="mt-1 text-xs text-blue-700">
-          Rancangan naskah peraturan diajukan oleh pemrakarsa lengkap dengan dokumen naskah akademik.
-        </p>
+      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h4 className="text-sm font-bold text-blue-900">
+            Tahap 1: Pengajuan & Dokumen Rancangan
+          </h4>
+          <p className="mt-1 text-xs text-blue-700">
+            Status dokumen: <strong className="font-semibold text-slate-800">{draft.status}</strong>. Kirim ke verifikator untuk memulai pembahasan dan rapat tindak lanjut.
+          </p>
+        </div>
+        {!isSudahLanjut ? (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleKirimKeVerifikator}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            <Send size={14} />
+            <span>{isPending ? "Mengirim..." : "Kirim ke Verifikator (Tahap Pembahasan)"}</span>
+            <ArrowRight size={14} />
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800 shrink-0">
+            <CheckCircle2 size={14} className="text-emerald-600" />
+            Terkirim ke Verifikator (Tahap {draft.tahapan})
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

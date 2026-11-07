@@ -159,7 +159,6 @@ export default function AdminSidebar({
           </div>
         </div>
 
-        {/* Navigation Menu List */}
         <nav
           className={`mt-2 flex-1 overflow-y-auto px-3.5 pb-6 custom-scrollbar transition-all duration-300 ${
             isSwitchingModule
@@ -174,16 +173,7 @@ export default function AdminSidebar({
                   activeModule === "HDH" ? "bg-amber-400" : "bg-blue-400"
                 }`}
               />
-              Navigasi {activeModule}
-            </span>
-            <span
-              className={`text-[9px] font-bold px-2 py-0.5 rounded-full ring-1 transition-all duration-300 ${
-                activeModule === "HDH"
-                  ? "bg-amber-500/20 text-amber-300 ring-amber-400/30"
-                  : "bg-blue-500/20 text-blue-300 ring-blue-400/30"
-              }`}
-            >
-              {activeModule === "HDH" ? "Harmonisasi" : "Regulasi"}
+              Menu Navigasi 
             </span>
           </div>
 

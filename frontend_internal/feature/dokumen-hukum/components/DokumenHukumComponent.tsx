@@ -1,11 +1,22 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useMemo } from "react";
 import {
   usePathname,
   useRouter,
   useSearchParams,
 } from "next/navigation";
+import {
+  FileText,
+  CheckCircle2,
+  Calendar,
+  Building2,
+  ShieldCheck,
+  FileCheck,
+  ExternalLink,
+  Search,
+} from "lucide-react";
+import { APP_BASE_URL } from "@/constanta/GlobalConstanta";
 
 import DataTable, {
   type DataTableColumn,
@@ -164,6 +175,7 @@ function DokumenHukumContent() {
    * ============================================================
    * PARAMETER API
    * ============================================================
+   * Hanya menampilkan dokumen hukum yang telah selesai dipublikasi/berlaku
    */
 
   const params = {
@@ -171,6 +183,7 @@ function DokumenHukumContent() {
     size,
     search,
     sort,
+    status: "Berlaku",
   };
 
   /**
@@ -448,54 +461,85 @@ function DokumenHukumContent() {
     );
   };
 
-  const columns: DataTableColumn<DokumenHukum>[] =
-    [
+  const columns: DataTableColumn<DokumenHukum>[] = useMemo(
+    () => [
       {
         key: "judul",
-        label: "Judul",
+        label: "Dokumen Hukum Terpublikasi",
         sortable: true,
-
-        render: (value) => (
-          <div className="max-w-[650px]">
-            <p className="font-medium text-slate-700">
-              {String(value ?? "-")}
-            </p>
+        render: (_val, row) => (
+          <div className="py-1">
+            <div className="font-bold text-slate-900 line-clamp-2 hover:text-blue-700 transition">
+              {row.judul}
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                {row.kategori || "Peraturan"}
+              </span>
+              <span>•</span>
+              <span className="font-medium text-slate-600">
+                Nomor: {row.nomor || "-"}
+              </span>
+              <span>•</span>
+              <span>Tahun {row.tahun || "-"}</span>
+              {row.bidang && (
+                <>
+                  <span>•</span>
+                  <span className="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                    {row.bidang}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         ),
       },
-
       {
-        key: "kategori",
-        label: "Kategori",
-        sortable: true,
-
-        render: (value) => (
-          <span className="text-slate-600">
-            {String(value ?? "-")}
-          </span>
+        key: "tipe_dokumen",
+        label: "Tipe & Penetapan",
+        width: "220px",
+        render: (_val, row) => (
+          <div className="text-xs">
+            <div className="font-semibold text-slate-700">
+              {row.tipe_dokumen || "-"}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {row.tempat_penetapan ? `${row.tempat_penetapan}, ` : ""}
+              {row.tanggal_penetapan ? String(row.tanggal_penetapan).split("T")[0] : ""}
+            </div>
+          </div>
         ),
       },
-
       {
-        key: "tahun",
-        label: "Tahun",
-        sortable: true,
-
-        render: (value) => (
-          <span className="text-slate-600">
-            {String(value ?? "-")}
-          </span>
-        ),
+        key: "file_dokumen",
+        label: "Berkas",
+        width: "140px",
+        align: "center",
+        render: (_val, row) => {
+          if (!row.file_dokumen) {
+            return <span className="text-xs text-slate-400">Tidak ada file</span>;
+          }
+          return (
+            <a
+              href={`${APP_BASE_URL}/uploads/dokumen-hukum/${row.file_dokumen}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
+            >
+              <FileText size={13} />
+              <span>Lihat PDF</span>
+              <ExternalLink size={11} />
+            </a>
+          );
+        },
       },
-
       {
         key: "status",
-        label: "Status",
-        width: "120px",
+        label: "Status Publikasi",
+        width: "160px",
         align: "center",
-
         render: (value) => {
-          const isActive =
+          const isBerlaku =
             value === "Berlaku" ||
             value === true ||
             value === 1;
@@ -505,26 +549,29 @@ function DokumenHukumContent() {
               className={`
                 inline-flex
                 items-center
-                rounded-lg
+                gap-1.5
+                rounded-full
                 px-3
-                py-1.5
+                py-1
                 text-xs
-                font-semibold
+                font-bold
+                border
                 ${
-                  isActive
-                    ? "bg-emerald-50 text-emerald-600"
-                    : "bg-slate-100 text-slate-500"
+                  isBerlaku
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
                 }
               `}
             >
-              {isActive
-                ? "Berlaku"
-                : "Tidak Berlaku"}
+              <CheckCircle2 size={13} className={isBerlaku ? "text-emerald-600" : "text-slate-400"} />
+              {isBerlaku ? "Selesai Publikasi" : String(value || "Draft")}
             </span>
           );
         },
       },
-    ];
+    ],
+    []
+  );
 
   /**
    * ============================================================
@@ -544,9 +591,9 @@ function DokumenHukumContent() {
             String(row.id)
           }
 
-          title="Dokumen Hukum"
+          title="Dokumen Hukum Publikasi"
 
-          description="Kelola banner dan Dokumen Hukum yang ditampilkan pada halaman utama website JDIH."
+          description="Daftar resmi peraturan perundang-undangan dan produk hukum yang telah selesai diverifikasi, diundangkan, dan berstatus Berlaku / Publikasi."
 
           searchPlaceholder="Cari dokumen hukum..."
 

@@ -294,7 +294,140 @@ const softDeleteDraft = async (id) => {
     return res.rows[0];
 };
 
+const getOptions = async ({ type = "", query = "" } = {}) => {
+    // Default fallback lists from GlobalConstanta
+    const defaults = {
+        kategori: [
+            "Peraturan",
+            "Keputusan",
+            "Instruksi",
+            "Perundang-Undangan",
+            "Monografi Hukum",
+            "Artikel / Majalah Hukum",
+            "Putusan / Yurisprudensi",
+            "Rancangan Peraturan",
+            "Surat Edaran",
+        ],
+        tipe_dokumen: [
+            "Undang-Undang",
+            "Peraturan Pemerintah",
+            "Peraturan Presiden",
+            "Peraturan Kepala BIN",
+            "Keputusan Kepala BIN",
+            "Instruksi Kepala BIN",
+            "Surat Edaran Kepala BIN",
+            "Peraturan Lembaga",
+            "Standar Operasional Prosedur",
+        ],
+        bidang: [
+            "Hukum Tata Negara",
+            "Hukum Administrasi Negara",
+            "Hukum Pidana",
+            "Hukum Acara Pidana",
+            "Hukum Perdata",
+            "Hukum Internasional",
+            "Hukum Siber & Sandi",
+            "Intelijen Strategis",
+            "Keamanan Nasional",
+            "Hukum Umum",
+        ],
+        subject: [
+            "Penyelenggaraan Intelijen Negara",
+            "Intelijen Negara",
+            "Keamanan Informasi & Sandi",
+            "Tata Kelola Organisasi & SDM",
+            "Operasi Intelijen & Kontra Intelijen",
+            "Pengawasan & Akuntabilitas",
+            "Kerjasama Antar Lembaga",
+            "Sistem Informasi & Teknologi Intelijen",
+            "Peraturan Internal & Disiplin Pegawai",
+        ],
+        status: [
+            "Berlaku",
+            "Tidak Berlaku",
+            "Draft",
+            "Dicabut",
+            "Diubah",
+        ],
+        tahun: Array.from({ length: 30 }, (_, i) => String(new Date().getFullYear() + 2 - i)),
+    };
+
+    const searchStr = (query || "").toLowerCase().trim();
+
+    // Helper to query distinct values from database
+    const fetchDbDistinct = async (column) => {
+        try {
+            const sql = `
+                SELECT DISTINCT TRIM(${column}) as val 
+                FROM dokumen_hukum 
+                WHERE ${column} IS NOT NULL AND TRIM(${column}) <> '' AND deleted_at IS NULL
+                ORDER BY val ASC
+            `;
+            const res = await pool.query(sql);
+            return res.rows.map((r) => r.val);
+        } catch (e) {
+            return [];
+        }
+    };
+
+    const buildList = async (colName, defaultList) => {
+        const fromDb = await fetchDbDistinct(colName);
+        const combined = Array.from(new Set([...fromDb, ...defaultList]));
+        const filtered = searchStr
+            ? combined.filter((item) => item.toLowerCase().includes(searchStr))
+            : combined;
+        return filtered.map((item) => ({
+            value: item,
+            label: item,
+        }));
+    };
+
+    if (type) {
+        const t = type.toLowerCase().trim();
+        if (t === "kategori") return await buildList("kategori", defaults.kategori);
+        if (t === "tipe_dokumen") return await buildList("tipe_dokumen", defaults.tipe_dokumen);
+        if (t === "bidang") return await buildList("bidang", defaults.bidang);
+        if (t === "subject" || t === "subjek") return await buildList("subjek", defaults.subject);
+        if (t === "status") {
+            const list = searchStr
+                ? defaults.status.filter((s) => s.toLowerCase().includes(searchStr))
+                : defaults.status;
+            return list.map((s) => ({ value: s, label: s }));
+        }
+        if (t === "tahun") {
+            const fromDbYears = await fetchDbDistinct("tahun");
+            const combinedYears = Array.from(new Set([...fromDbYears.map(String), ...defaults.tahun]));
+            combinedYears.sort((a, b) => Number(b) - Number(a));
+            const filteredYears = searchStr
+                ? combinedYears.filter((y) => y.includes(searchStr))
+                : combinedYears;
+            return filteredYears.map((y) => ({ value: y, label: y }));
+        }
+    }
+
+    // Return all categories bundle
+    const [kategori, tipe_dokumen, bidang, subject] = await Promise.all([
+        buildList("kategori", defaults.kategori),
+        buildList("tipe_dokumen", defaults.tipe_dokumen),
+        buildList("bidang", defaults.bidang),
+        buildList("subjek", defaults.subject),
+    ]);
+
+    const status = defaults.status.map((s) => ({ value: s, label: s }));
+    const tahun = defaults.tahun.map((y) => ({ value: y, label: y }));
+
+    return {
+        kategori,
+        tipe_dokumen,
+        bidang,
+        subject,
+        status,
+        tahun,
+    };
+};
+
 module.exports = {
+    getOptions,
     findAll,
     findById,
     createDraft,

@@ -7,6 +7,7 @@ import {
   deletePejabatPersetujuan,
   deletePembahasanRapat,
   deletePengajuan,
+  fetchMasterOptions,
   fetchPengajuanDetail,
   fetchPengajuanList,
   submitHarmonisasi,
@@ -192,4 +193,13 @@ export const useDeletePengajuan = () => {
     },
   });
 };
+
+export const useMasterOptions = (type: string, query: string = "") => {
+  return useQuery({
+    queryKey: ["MasterOptions", type, query],
+    queryFn: () => fetchMasterOptions(type, query),
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
 

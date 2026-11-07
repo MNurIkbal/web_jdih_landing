@@ -1,5 +1,21 @@
 const pengajuanService = require("../services/pengajuanPeraturan.service");
 
+const getOptions = async (req, res) => {
+    try {
+        const { type, query } = req.query;
+        const result = await pengajuanService.getOptions({ type, query });
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
 const getAll = async (req, res) => {
     try {
         const result = await pengajuanService.getAll({
@@ -279,6 +295,7 @@ const remove = async (req, res) => {
 };
 
 module.exports = {
+    getOptions,
     getAll,
     getById,
     create,

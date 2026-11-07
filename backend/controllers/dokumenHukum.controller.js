@@ -15,6 +15,8 @@ const getAll = async (req, res) => {
                     req.query.page || 1,
                 size:
                     req.query.size || 10,
+                status:
+                    req.query.status || "",
             });
 
         return res.status(200).json({

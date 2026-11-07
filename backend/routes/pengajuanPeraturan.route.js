@@ -3,6 +3,7 @@ const router = express.Router();
 const pengajuanController = require("../controllers/pengajuanPeraturan.controller");
 const upload = require("../middleware/pengajuanPeraturanUpload");
 
+router.get("/options", pengajuanController.getOptions);
 router.get("/", pengajuanController.getAll);
 router.get("/:id", pengajuanController.getById);
 

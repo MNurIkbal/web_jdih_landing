@@ -5,11 +5,33 @@ const findAll = async ({
     search = "",
     page = 1,
     size = 10,
+    status = "",
 }) => {
     const offset = (page - 1) * size;
+    const conditions = ["deleted_at IS NULL"];
+    const values = [];
+    let idx = 1;
 
-    const searchValue =
-        `%${search.trim()}%`;
+    if (search && search.trim()) {
+        conditions.push(`(
+            judul ILIKE $${idx}
+            OR kategori ILIKE $${idx}
+            OR nomor ILIKE $${idx}
+            OR bidang ILIKE $${idx}
+            OR tipe_dokumen ILIKE $${idx}
+            OR subjek ILIKE $${idx}
+        )`);
+        values.push(`%${search.trim()}%`);
+        idx++;
+    }
+
+    if (status && status.trim()) {
+        conditions.push(`status = $${idx}`);
+        values.push(status.trim());
+        idx++;
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const dataQuery = `
         SELECT
@@ -34,45 +56,27 @@ const findAll = async ({
             created_at,
             updated_at
         FROM dokumen_hukum
-        WHERE deleted_at IS NULL
-          AND (
-              judul ILIKE $1
-              OR kategori ILIKE $1
-              OR nomor ILIKE $1
-              OR bidang ILIKE $1
-              OR tipe_dokumen ILIKE $1
-              OR subjek ILIKE $1
-          )
+        ${whereClause}
         ORDER BY id DESC
-        LIMIT $2
-        OFFSET $3
+        LIMIT $${idx}
+        OFFSET $${idx + 1}
     `;
 
     const countQuery = `
         SELECT COUNT(*) AS total
         FROM dokumen_hukum
-        WHERE deleted_at IS NULL
-          AND (
-              judul ILIKE $1
-              OR kategori ILIKE $1
-              OR nomor ILIKE $1
-              OR bidang ILIKE $1
-              OR tipe_dokumen ILIKE $1
-              OR subjek ILIKE $1
-          )
+        ${whereClause}
     `;
 
     const [dataResult, countResult] =
         await Promise.all([
             pool.query(dataQuery, [
-                searchValue,
+                ...values,
                 size,
                 offset,
             ]),
 
-            pool.query(countQuery, [
-                searchValue,
-            ]),
+            pool.query(countQuery, values),
         ]);
 
     return {

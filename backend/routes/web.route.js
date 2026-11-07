@@ -27,6 +27,7 @@ router.get("/berita/:id/related", beritaController.getOtherBerita);
 router.get("/sumary-dashboard", dokumenHukumController.getSummary);
 router.get("/dokumen-hukum", dokumenHukumController.getList);
 router.get("/dokumen-hukum-pagination", dokumenHukumController.getAllWeb);
+router.get("/dokumen-hukum/master-options", require("../controllers/pengajuanPeraturan.controller").getOptions);
 router.get("/dokumen-hukum/:id", dokumenHukumController.getById);
 router.get("/dokumen-hukum/:id/related", dokumenHukumController.getRelated);
 router.post("/dokumen-hukum/:id/download", dokumenHukumController.controlDownload);

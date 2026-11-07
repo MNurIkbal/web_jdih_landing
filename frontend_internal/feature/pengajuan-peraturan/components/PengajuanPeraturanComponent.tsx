@@ -339,20 +339,23 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  // Form State (Default kosong semua)
+  // Form State (Default kosong semua, urutan dan nama field 100% sama dengan DokumenHukumForm)
   const [judul, setJudul] = useState("");
   const [kategori, setKategori] = useState("");
+  const [tipeDokumen, setTipeDokumen] = useState("");
   const [nomorRancangan, setNomorRancangan] = useState("");
   const [tahun, setTahun] = useState("");
-  const [tipeDokumen, setTipeDokumen] = useState("");
   const [bidang, setBidang] = useState("");
-
   const [tempatPenetapan, setTempatPenetapan] = useState("");
-  const [tanggalPengajuan, setTanggalPengajuan] = useState("");
-  const [targetPenetapan, setTargetPenetapan] = useState("");
+
+  const [tanggalPenetapan, setTanggalPenetapan] = useState("");
+  const [tanggalPengundangan, setTanggalPengundangan] = useState("");
+  const [tanggalBerlaku, setTanggalBerlaku] = useState("");
   const [sumber, setSumber] = useState("");
   const [subject, setSubject] = useState("");
+  const [status, setStatus] = useState("Draft");
 
+  // Identitas Pengusul & Catatan
   const [pemrakarsa, setPemrakarsa] = useState("");
   const [penanggungJawab, setPenanggungJawab] = useState("");
   const [ringkasan, setRingkasan] = useState("");
@@ -373,41 +376,70 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
     };
   }, [previewPdfUrl]);
 
-  // Options converters
-  const kategoriSelectOptions: SelectSearchOption[] = useMemo(
-    () =>
-      kategoriOptions
-        .filter((o) => o.value)
-        .map((o) => ({ value: o.value, label: o.label })),
-    []
-  );
+  // Master Options dari API (Dynamic via React Query)
+  const { data: apiKategori } = useMasterOptions("kategori");
+  const { data: apiTipeDokumen } = useMasterOptions("tipe_dokumen");
+  const { data: apiBidang } = useMasterOptions("bidang");
+  const { data: apiSubject } = useMasterOptions("subject");
+  const { data: apiStatus } = useMasterOptions("status");
+  const { data: apiTahun } = useMasterOptions("tahun");
 
-  const tipeDokumenSelectOptions: SelectSearchOption[] = useMemo(
-    () =>
-      tipeDokumenOptions.map((o) => ({
-        value: o.value,
-        label: o.label,
-      })),
-    []
-  );
+  // Fallback initial options jika API sedang dimuat
+  const kategoriSelectOptions: SelectSearchOption[] = useMemo(() => {
+    if (apiKategori && apiKategori.length > 0) return apiKategori;
+    return kategoriOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
+  }, [apiKategori]);
 
-  const bidangSelectOptions: SelectSearchOption[] = useMemo(
-    () =>
-      bidangOptions.map((o) => ({
-        value: o.value,
-        label: o.label,
-      })),
-    []
-  );
+  const tipeDokumenSelectOptions: SelectSearchOption[] = useMemo(() => {
+    if (apiTipeDokumen && apiTipeDokumen.length > 0) return apiTipeDokumen;
+    return tipeDokumenOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
+  }, [apiTipeDokumen]);
 
-  const subjectSelectOptions: SelectSearchOption[] = useMemo(
-    () =>
-      subjectOptions.map((o) => ({
-        value: o.value,
-        label: o.label,
-      })),
-    []
-  );
+  const bidangSelectOptions: SelectSearchOption[] = useMemo(() => {
+    if (apiBidang && apiBidang.length > 0) return apiBidang;
+    return bidangOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
+  }, [apiBidang]);
+
+  const subjectSelectOptions: SelectSearchOption[] = useMemo(() => {
+    if (apiSubject && apiSubject.length > 0) return apiSubject;
+    return subjectOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
+  }, [apiSubject]);
+
+  const statusSelectOptions: SelectSearchOption[] = useMemo(() => {
+    if (apiStatus && apiStatus.length > 0) return apiStatus;
+    return statusOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
+  }, [apiStatus]);
+
+  const tahunSelectOptions: SelectSearchOption[] = useMemo(() => {
+    if (apiTahun && apiTahun.length > 0) return apiTahun;
+    return tahunOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
+  }, [apiTahun]);
+
+  // Dynamic API search handlers for select inputs
+  const handleSearchKategori = async (q: string) => {
+    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
+    return await fetchMasterOptions("kategori", q);
+  };
+
+  const handleSearchTipeDokumen = async (q: string) => {
+    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
+    return await fetchMasterOptions("tipe_dokumen", q);
+  };
+
+  const handleSearchBidang = async (q: string) => {
+    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
+    return await fetchMasterOptions("bidang", q);
+  };
+
+  const handleSearchSubject = async (q: string) => {
+    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
+    return await fetchMasterOptions("subject", q);
+  };
+
+  const handleSearchTahun = async (q: string) => {
+    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
+    return await fetchMasterOptions("tahun", q);
+  };
 
   // Search API for Referensi Dokumen / Produk Hukum
   const handleSearchDokumenApi = async (query: string): Promise<SelectSearchOption[]> => {
@@ -439,7 +471,7 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validasi Zod Schema
+    // Validasi Zod Schema identik dengan DokumenHukum
     const validation = PengajuanPeraturanSchema.safeParse({
       judul,
       kategori,
@@ -447,13 +479,15 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
       nomor_rancangan: nomorRancangan,
       tahun,
       bidang,
-      subject,
       tempat_penetapan: tempatPenetapan,
-      tanggal_pengajuan: tanggalPengajuan,
-      target_penetapan: targetPenetapan,
+      tanggal_penetapan: tanggalPenetapan,
+      tanggal_pengundangan: tanggalPengundangan,
+      tanggal_berlaku: tanggalBerlaku,
+      sumber,
+      subject,
+      status: status || "Draft",
       pemrakarsa,
       penanggung_jawab: penanggungJawab,
-      sumber,
       ringkasan,
       file_draft: fileDraft,
       file_naskah_akademik: fileNaskah,
@@ -483,16 +517,18 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
     fd.append("tahun", tahun);
     fd.append("pemrakarsa", pemrakarsa);
     fd.append("penanggung_jawab", penanggungJawab);
-    fd.append("tanggal_pengajuan", tanggalPengajuan);
-    if (targetPenetapan) fd.append("target_penetapan", targetPenetapan);
+    fd.append("tanggal_pengajuan", tanggalPengundangan || new Date().toISOString().split("T")[0]);
+    if (tanggalPenetapan) fd.append("target_penetapan", tanggalPenetapan);
 
     const fullRingkasan = [
       ringkasan,
       `[Tipe: ${tipeDokumen}]`,
       `[Bidang: ${bidang}]`,
       `[Tempat Penetapan: ${tempatPenetapan}]`,
+      `[Tanggal Berlaku: ${tanggalBerlaku}]`,
       sumber ? `[Sumber: ${sumber}]` : "",
       subject ? `[Subjek: ${subject}]` : "",
+      status ? `[Status: ${status}]` : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -517,17 +553,16 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
             <FileText size={24} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-            </div>
             <h3 className="mt-1 text-xl font-extrabold text-slate-900">
-              Pengajuan Rancangan Dokumen Hukum
+              Pengajuan Rancangan Dokumen Hukum Baru
             </h3>
             <p className="text-xs text-slate-500">
-              Silahkan Lengkap form di bawah ini 
+              Formulir terstandar Dokumen Hukum JDIH. Status awal pengajuan adalah Draft sebelum ditindaklanjuti.
             </p>
           </div>
         </div>
         <button
+          type="button"
           onClick={onClose}
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm cursor-pointer"
         >
@@ -538,30 +573,33 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
       {/* Form Body - Full Width & Scrollbar di pojok kanan layar */}
       <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar">
         <div className="w-full px-6 sm:px-10 lg:px-16 py-8 space-y-8">
-          {/* Section 1: Informasi Utama */}
+          {/* Section 01: Informasi Dokumen (Persis DokumenHukumForm) */}
           <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
-            <div className="border-b border-slate-100 pb-3">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
-                Informasi Utama Dokumen Hukum
-              </h4>
-              <p className="text-xs text-slate-500 mt-0.5">Identitas rancangan peraturan yang akan diajukan</p>
+            <div className="border-b border-slate-100 pb-3 flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-600">
+                01
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Informasi Dokumen
+                </h4>
+                <p className="text-xs text-slate-400">Informasi dasar dokumen hukum yang diajukan</p>
+              </div>
             </div>
 
+            {/* JUDUL */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Judul Rancangan Dokumen Hukum <span className="text-rose-500 ml-1">*</span>
+                Judul <span className="text-rose-500 ml-1">*</span>
               </label>
               <input
                 type="text"
                 value={judul}
                 onChange={(e) => {
                   setJudul(e.target.value);
-                  if (formErrors.judul) {
-                    setFormErrors((prev) => ({ ...prev, judul: "" }));
-                  }
+                  if (formErrors.judul) setFormErrors((prev) => ({ ...prev, judul: "" }));
                 }}
-                placeholder="Contoh: Peraturan Kepala Badan Intelijen Negara tentang Sistem Tata Kelola Keamanan Informasi"
+                placeholder="Masukkan judul dokumen hukum"
                 className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none transition ${
                   formErrors.judul
                     ? "border-rose-400 ring-2 ring-rose-100"
@@ -573,10 +611,11 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* KATEGORI */}
               <div>
                 <FormSelectSearch
-                  label="Kategori Dokumen"
+                  label="Kategori"
                   required
                   value={kategori}
                   onChange={(val) => {
@@ -584,69 +623,76 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                     if (formErrors.kategori) setFormErrors((prev) => ({ ...prev, kategori: "" }));
                   }}
                   options={kategoriSelectOptions}
+                  onSearchApi={handleSearchKategori}
                   error={formErrors.kategori}
                   placeholder="Pilih kategori..."
-                  searchPlaceholder="Cari kategori..."
+                  searchPlaceholder="Cari kategori dari API..."
                 />
               </div>
 
+              {/* TIPE DOKUMEN */}
               <div>
                 <FormSelectSearch
-                  label="Tipe Dokumen Hukum"
-                  required
+                  label="Tipe Dokumen"
                   value={tipeDokumen}
                   onChange={(val) => {
                     setTipeDokumen(val);
                     if (formErrors.tipe_dokumen) setFormErrors((prev) => ({ ...prev, tipe_dokumen: "" }));
                   }}
                   options={tipeDokumenSelectOptions}
+                  onSearchApi={handleSearchTipeDokumen}
                   error={formErrors.tipe_dokumen}
                   placeholder="Pilih tipe dokumen..."
-                  searchPlaceholder="Cari tipe dokumen..."
+                  searchPlaceholder="Cari tipe dokumen dari API..."
                 />
               </div>
 
+              {/* NOMOR */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Nomor Rancangan
+                  Nomor <span className="text-rose-500 ml-1">*</span>
                 </label>
                 <input
                   type="text"
                   value={nomorRancangan}
-                  onChange={(e) => setNomorRancangan(e.target.value)}
-                  placeholder="Contoh: R-01/PER/2026"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Tahun <span className="text-rose-500 ml-1">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={tahun}
-                  placeholder="Contoh: 2026"
                   onChange={(e) => {
-                    setTahun(e.target.value);
-                    if (formErrors.tahun) setFormErrors((prev) => ({ ...prev, tahun: "" }));
+                    setNomorRancangan(e.target.value);
+                    if (formErrors.nomor_rancangan) setFormErrors((prev) => ({ ...prev, nomor_rancangan: "" }));
                   }}
+                  placeholder="Masukkan nomor dokumen"
                   className={`mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none transition ${
-                    formErrors.tahun
+                    formErrors.nomor_rancangan
                       ? "border-rose-400 ring-2 ring-rose-100"
                       : "border-slate-200 focus:border-blue-500"
                   }`}
                 />
-                {formErrors.tahun && (
-                  <p className="text-xs text-rose-500 mt-1">{formErrors.tahun}</p>
+                {formErrors.nomor_rancangan && (
+                  <p className="text-xs text-rose-500 mt-1">{formErrors.nomor_rancangan}</p>
                 )}
               </div>
 
+              {/* TAHUN */}
               <div>
                 <FormSelectSearch
-                  label="Bidang Hukum"
+                  label="Tahun"
+                  required
+                  value={tahun}
+                  onChange={(val) => {
+                    setTahun(val);
+                    if (formErrors.tahun) setFormErrors((prev) => ({ ...prev, tahun: "" }));
+                  }}
+                  options={tahunSelectOptions}
+                  onSearchApi={handleSearchTahun}
+                  error={formErrors.tahun}
+                  placeholder="Pilih tahun..."
+                  searchPlaceholder="Cari tahun dari API..."
+                />
+              </div>
+
+              {/* BIDANG */}
+              <div>
+                <FormSelectSearch
+                  label="Bidang"
                   required
                   value={bidang}
                   onChange={(val) => {
@@ -654,79 +700,144 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                     if (formErrors.bidang) setFormErrors((prev) => ({ ...prev, bidang: "" }));
                   }}
                   options={bidangSelectOptions}
+                  onSearchApi={handleSearchBidang}
                   error={formErrors.bidang}
                   placeholder="Pilih bidang..."
-                  searchPlaceholder="Cari bidang hukum..."
+                  searchPlaceholder="Cari bidang dari API..."
                 />
               </div>
 
+              {/* TEMPAT PENETAPAN */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Tempat Penetapan <span className="text-rose-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tempatPenetapan}
+                  onChange={(e) => {
+                    setTempatPenetapan(e.target.value);
+                    if (formErrors.tempat_penetapan) setFormErrors((prev) => ({ ...prev, tempat_penetapan: "" }));
+                  }}
+                  placeholder="Contoh: Jakarta, Surabaya"
+                  className={`mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none transition ${
+                    formErrors.tempat_penetapan
+                      ? "border-rose-400 ring-2 ring-rose-100"
+                      : "border-slate-200 focus:border-blue-500"
+                  }`}
+                />
+                {formErrors.tempat_penetapan && (
+                  <p className="text-xs text-rose-500 mt-1">{formErrors.tempat_penetapan}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 02: Detail Penetapan & Pengusul (Persis DokumenHukumForm) */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
+            <div className="border-b border-slate-100 pb-3 flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-600">
+                02
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Detail Penetapan
+                </h4>
+                <p className="text-xs text-slate-400">Informasi tanggal, klasifikasi dokumen, dan unit pemrakarsa</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {/* TANGGAL PENETAPAN */}
+              <div>
+                <FormDatePicker
+                  label="Tanggal Penetapan"
+                  required
+                  value={tanggalPenetapan}
+                  onChange={(d) => {
+                    setTanggalPenetapan(d);
+                    if (formErrors.tanggal_penetapan) setFormErrors((prev) => ({ ...prev, tanggal_penetapan: "" }));
+                  }}
+                  error={formErrors.tanggal_penetapan}
+                  placeholder="Pilih tanggal penetapan..."
+                />
+              </div>
+
+              {/* TANGGAL PENGUNDANGAN */}
+              <div>
+                <FormDatePicker
+                  label="Tanggal Pengundangan"
+                  required
+                  value={tanggalPengundangan}
+                  onChange={(d) => {
+                    setTanggalPengundangan(d);
+                    if (formErrors.tanggal_pengundangan) setFormErrors((prev) => ({ ...prev, tanggal_pengundangan: "" }));
+                  }}
+                  error={formErrors.tanggal_pengundangan}
+                  placeholder="Pilih tanggal pengundangan..."
+                />
+              </div>
+
+              {/* TANGGAL BERLAKU */}
+              <div>
+                <FormDatePicker
+                  label="Tanggal Berlaku"
+                  required
+                  value={tanggalBerlaku}
+                  onChange={(d) => {
+                    setTanggalBerlaku(d);
+                    if (formErrors.tanggal_berlaku) setFormErrors((prev) => ({ ...prev, tanggal_berlaku: "" }));
+                  }}
+                  error={formErrors.tanggal_berlaku}
+                  placeholder="Pilih tanggal berlaku..."
+                />
+              </div>
+
+              {/* SUMBER */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Sumber
+                </label>
+                <input
+                  type="text"
+                  value={sumber}
+                  onChange={(e) => setSumber(e.target.value)}
+                  placeholder="Masukkan sumber dokumen"
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
+                />
+              </div>
+
+              {/* SUBJECT */}
               <div>
                 <FormSelectSearch
-                  label="Subjek Hukum"
-                  required
+                  label="Subject"
                   value={subject}
                   onChange={(val) => {
                     setSubject(val);
                     if (formErrors.subject) setFormErrors((prev) => ({ ...prev, subject: "" }));
                   }}
                   options={subjectSelectOptions}
+                  onSearchApi={handleSearchSubject}
                   error={formErrors.subject}
-                  placeholder="Pilih subjek..."
-                  searchPlaceholder="Cari subjek hukum..."
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Penetapan & Unit Pemrakarsa */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
-            <div className="border-b border-slate-100 pb-3">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
-                Penetapan & Unit Pemrakarsa
-              </h4>
-              <p className="text-xs text-slate-500 mt-0.5">Data tempat, tanggal pengajuan, serta penanggung jawab perumusan</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Tempat Penetapan
-                </label>
-                <input
-                  type="text"
-                  value={tempatPenetapan}
-                  onChange={(e) => setTempatPenetapan(e.target.value)}
-                  placeholder="Contoh: Jakarta"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
+                  placeholder="Pilih subject..."
+                  searchPlaceholder="Cari subject dari API..."
                 />
               </div>
 
+              {/* STATUS */}
               <div>
-                <FormDatePicker
-                  label="Tanggal Pengajuan"
+                <FormSelectSearch
+                  label="Status"
                   required
-                  value={tanggalPengajuan}
-                  onChange={(d) => {
-                    setTanggalPengajuan(d);
-                    if (formErrors.tanggal_pengajuan) setFormErrors((prev) => ({ ...prev, tanggal_pengajuan: "" }));
-                  }}
-                  error={formErrors.tanggal_pengajuan}
-                  placeholder="Pilih tanggal pengajuan..."
+                  value={status}
+                  onChange={(val) => setStatus(val)}
+                  options={statusSelectOptions}
+                  placeholder="Pilih status..."
+                  searchPlaceholder="Cari status..."
                 />
               </div>
 
-              <div>
-                <FormDatePicker
-                  label="Target Penetapan"
-                  value={targetPenetapan}
-                  onChange={(d) => setTargetPenetapan(d)}
-                  placeholder="Pilih target tanggal penetapan..."
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {/* UNIT PEMRAKARSA */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                   Unit Pemrakarsa <span className="text-rose-500 ml-1">*</span>
@@ -750,6 +861,7 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                 )}
               </div>
 
+              {/* PENANGGUNG JAWAB */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
                   Penanggung Jawab Perumusan
@@ -760,18 +872,6 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                   onChange={(e) => setPenanggungJawab(e.target.value)}
                   placeholder="Contoh: Direktur Regulasi Keamanan"
                   className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
-                />
-              </div>
-
-              <div>
-                {/* Select Search dengan integrasi API Dokumen Hukum */}
-                <FormSelectSearch
-                  label="Referensi / Sumber Dokumen Terkait"
-                  value={sumber}
-                  onChange={(val) => setSumber(val)}
-                  onSearchApi={handleSearchDokumenApi}
-                  placeholder="Ketik untuk mencari referensi dokumen..."
-                  searchPlaceholder="Ketik judul dokumen perundang-undangan..."
                 />
               </div>
             </div>
@@ -790,21 +890,25 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* Section 3: Berkas Dokumen & Naskah Akademik dengan Preview */}
+          {/* Section 03: Berkas Dokumen & Pratinjau (Persis DokumenHukumForm) */}
           <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
-            <div className="border-b border-slate-100 pb-3">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
-                Upload Berkas Dokumen & Pratinjau (Preview PDF)
-              </h4>
-              <p className="text-xs text-slate-500 mt-0.5">Unggah draft naskah regulasi dan naskah akademik penunjang. Anda dapat melihat pratinjau PDF langsung sebelum menyimpan.</p>
+            <div className="border-b border-slate-100 pb-3 flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-xs font-bold text-emerald-600">
+                03
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Berkas Dokumen
+                </h4>
+                <p className="text-xs text-slate-400">Upload dokumen dalam format PDF atau DOC. Pratinjau PDF tersedia sebelum disimpan.</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {/* Draft Naskah */}
+              {/* File Dokumen Utama / Draft */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                  Draft Naskah Regulasi <span className="text-rose-500 ml-1">*</span>
+                  File Dokumen (PDF) <span className="text-rose-500 ml-1">*</span>
                 </label>
                 <div
                   className={`rounded-2xl border-2 border-dashed p-6 text-center transition ${
@@ -837,7 +941,7 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                       </div>
                     ) : (
                       <div>
-                        <p className="text-xs font-bold text-slate-700">Pilih Berkas Draft (PDF/DOC)</p>
+                        <p className="text-xs font-bold text-slate-700">Pilih Berkas Dokumen (PDF)</p>
                         <p className="text-[11px] text-slate-400 mt-1">Maksimal ukuran file 50 MB</p>
                       </div>
                     )}
@@ -848,7 +952,7 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                     <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleOpenPdfPreview(fileDraft, `Preview Draft: ${fileDraft.name}`)}
+                        onClick={() => handleOpenPdfPreview(fileDraft, `Preview Dokumen: ${fileDraft.name}`)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition cursor-pointer"
                       >
                         <ExternalLink size={13} />
@@ -870,10 +974,10 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                 )}
               </div>
 
-              {/* Naskah Akademik */}
+              {/* File Abstrak / Naskah Akademik */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                  Naskah Akademik / Kajian Hukum
+                  File Abstrak / Naskah Akademik
                 </label>
                 <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 p-6 text-center hover:border-amber-400 hover:bg-amber-50/30 transition">
                   <input
@@ -896,18 +1000,18 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
                       </div>
                     ) : (
                       <div>
-                        <p className="text-xs font-bold text-slate-700">Pilih Naskah Akademik (PDF/DOC)</p>
-                        <p className="text-[11px] text-slate-400 mt-1">Opsional, jika naskah akademik tersedia</p>
+                        <p className="text-xs font-bold text-slate-700">Pilih File Abstrak (PDF/DOC)</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Opsional, jika naskah penunjang tersedia</p>
                       </div>
                     )}
                   </label>
 
-                  {/* Tombol Preview PDF jika naskah akademik dipilih */}
+                  {/* Tombol Preview PDF jika file naskah dipilih */}
                   {fileNaskah && (
                     <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleOpenPdfPreview(fileNaskah, `Preview Naskah Akademik: ${fileNaskah.name}`)}
+                        onClick={() => handleOpenPdfPreview(fileNaskah, `Preview Abstrak: ${fileNaskah.name}`)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer"
                       >
                         <ExternalLink size={13} />

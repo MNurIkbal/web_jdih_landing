@@ -78,6 +78,7 @@ const logoutController = async (req, res) => {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
+      path: "/",
     });
 
     return res.status(200).json({

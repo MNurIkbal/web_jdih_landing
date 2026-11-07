@@ -67,7 +67,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (sessionQuery.data?.success) {
+    if (sessionQuery.data?.success && sessionQuery.data?.data) {
       router.replace("/admin/dashboard");
       return;
     }

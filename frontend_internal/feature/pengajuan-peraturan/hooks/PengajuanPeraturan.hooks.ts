@@ -4,6 +4,7 @@ import {
   addPejabatPersetujuan,
   addPembahasanRapat,
   createPengajuan,
+  updatePengajuan,
   deletePejabatPersetujuan,
   deletePembahasanRapat,
   deletePengajuan,
@@ -49,6 +50,21 @@ export const useCreatePengajuan = () => {
     mutationFn: createPengajuan,
     onSuccess: () => {
       toast.success("Pengajuan rancangan peraturan berhasil disimpan");
+      qc.invalidateQueries({ queryKey: ["PengajuanPeraturan"] });
+    },
+    onError: (error: any) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+};
+
+export const useUpdatePengajuan = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+      updatePengajuan(id, formData),
+    onSuccess: () => {
+      toast.success("Pengajuan rancangan peraturan berhasil diperbarui");
       qc.invalidateQueries({ queryKey: ["PengajuanPeraturan"] });
     },
     onError: (error: any) => {

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import FormImageUpload from "@/components/ui/FormImageUpload";
 import FormInput from "@/components/ui/FormInput";
+import FormSelectSearch from "@/components/ui/FormSelectSearch";
 
 import { Pengguna } from "../types/Pengguna.type";
 
@@ -53,6 +54,7 @@ export default function PenggunaForm({
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<PenggunaFormValues>({
     resolver: zodResolver(
@@ -63,6 +65,7 @@ export default function PenggunaForm({
       id: undefined,
       nama: "",
       email: "",
+      role: "pengguna",
       password: "",
       foto: null,
     },
@@ -431,23 +434,35 @@ export default function PenggunaForm({
         }
       />
 
-      <div className="space-y-1">
-        <label className="block text-xs font-semibold text-slate-700">
-          Role Akses *
-        </label>
-        <select
-          {...register("role")}
-          disabled={isSubmitting}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
-        >
-          <option value="pengguna">Pengguna (Pembuat Pengajuan & Dokumen Hukum)</option>
-          <option value="admin">Admin (Verifikator Semua Menu kecuali Pengguna & Pengaturan)</option>
-          <option value="superadmin">Superadmin (Akses Penuh Semua Menu)</option>
-        </select>
-        {errors.role && (
-          <p className="text-xs text-rose-500">{errors.role.message}</p>
-        )}
-      </div>
+      <FormSelectSearch
+        label="Role Akses"
+        required
+        value={watch("role") || "pengguna"}
+        onChange={(val) => {
+          setValue("role", val as "superadmin" | "admin" | "pengguna", {
+            shouldValidate: true,
+            shouldDirty: true,
+          });
+        }}
+        options={[
+          {
+            value: "pengguna",
+            label: "Pengguna (Pembuat Pengajuan & Dokumen Hukum)",
+          },
+          {
+            value: "admin",
+            label: "Admin (Verifikator Semua Menu kecuali Pengguna & Pengaturan)",
+          },
+          {
+            value: "superadmin",
+            label: "Superadmin (Akses Penuh Semua Menu)",
+          },
+        ]}
+        placeholder="Pilih role akses..."
+        searchPlaceholder="Cari role..."
+        error={errors.role?.message}
+        disabled={isSubmitting}
+      />
 
       {!isEdit && (
         <FormInput

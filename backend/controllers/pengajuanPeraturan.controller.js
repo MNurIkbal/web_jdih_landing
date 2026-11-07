@@ -1,5 +1,9 @@
+const fs = require("fs");
+const path = require("path");
+const jwt = require("jsonwebtoken");
 const pengajuanService = require("../services/pengajuanPeraturan.service");
 const { invalidateCache } = require("../config/redis");
+const { applyWatermark } = require("../utils/pdfWatermark");
 
 const getOptions = async (req, res) => {
     try {
@@ -40,7 +44,26 @@ const getAll = async (req, res) => {
 
 const getById = async (req, res) => {
     try {
-        const result = await pengajuanService.getById(req.params.id);
+        let result = await pengajuanService.getById(req.params.id);
+        
+        // Cek jika yang membuka adalah admin/verifikator dan status masih Submit Dokumen atau Pengajuan Ulang
+        try {
+            const token = req.cookies?.access_token || req.headers?.authorization?.replace("Bearer ", "");
+            if (token) {
+                const decoded = jwt.decode(token);
+                const role = (decoded?.role || "").toLowerCase();
+                if (role === "admin" || role === "superadmin") {
+                    if (result.status === "Submit Dokumen" || result.status === "Pengajuan Ulang") {
+                        const updated = await pengajuanService.updateTahap(result.id, result.tahapan, "Review", result.catatan_verifikasi);
+                        await invalidateCache("pengajuan:*");
+                        result = { ...result, status: "Review" };
+                    }
+                }
+            }
+        } catch (e) {
+            // Abaikan jika token gagal decode
+        }
+
         return res.status(200).json({
             success: true,
             data: result,
@@ -59,6 +82,14 @@ const create = async (req, res) => {
         const {
             judul,
             kategori,
+            bidang,
+            tipe_dokumen,
+            status_dokumen,
+            tempat_penetapan,
+            subject,
+            sumber,
+            urgensi,
+            dasar_hukum,
             nomor_rancangan,
             tahun,
             pemrakarsa,
@@ -75,6 +106,14 @@ const create = async (req, res) => {
         const result = await pengajuanService.create({
             judul,
             kategori,
+            bidang,
+            tipe_dokumen,
+            status_dokumen,
+            tempat_penetapan,
+            subject,
+            sumber,
+            urgensi,
+            dasar_hukum,
             nomor_rancangan,
             tahun,
             pemrakarsa,
@@ -103,11 +142,80 @@ const create = async (req, res) => {
     }
 };
 
-// Update Tahapan umum
+// Update Data Pengajuan Peraturan
+const update = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            judul,
+            kategori,
+            bidang,
+            tipe_dokumen,
+            status_dokumen,
+            tempat_penetapan,
+            subject,
+            sumber,
+            urgensi,
+            dasar_hukum,
+            nomor_rancangan,
+            tahun,
+            pemrakarsa,
+            penanggung_jawab,
+            tanggal_pengajuan,
+            target_penetapan,
+            ringkasan,
+            status,
+            tahapan,
+        } = req.body;
+
+        const fileDraft = req.files?.file_draft?.[0]?.filename || req.files?.file_dokumen?.[0]?.filename || null;
+        const fileNaskahAkademik = req.files?.file_naskah_akademik?.[0]?.filename || req.files?.file_abstrak?.[0]?.filename || null;
+
+        const result = await pengajuanService.update(id, {
+            judul,
+            kategori,
+            bidang,
+            tipe_dokumen,
+            status_dokumen,
+            tempat_penetapan,
+            subject,
+            sumber,
+            urgensi,
+            dasar_hukum,
+            nomor_rancangan,
+            tahun,
+            pemrakarsa,
+            penanggung_jawab,
+            tanggal_pengajuan,
+            target_penetapan,
+            ringkasan,
+            status,
+            tahapan,
+            file_draft: fileDraft,
+            file_naskah_akademik: fileNaskahAkademik,
+        });
+
+        // Invalidate Redis cache
+        await invalidateCache("pengajuan:*");
+
+        return res.status(200).json({
+            success: true,
+            message: "Pengajuan peraturan berhasil diperbarui",
+            data: result,
+        });
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+// Update Tahapan umum & Verifikasi
 const updateTahapan = async (req, res) => {
     try {
-        const { tahapan, status } = req.body;
-        const result = await pengajuanService.updateTahap(req.params.id, tahapan, status);
+        const { tahapan, status, catatan_verifikasi } = req.body;
+        const result = await pengajuanService.updateTahap(req.params.id, tahapan, status, catatan_verifikasi);
         return res.status(200).json({
             success: true,
             message: "Tahapan pengajuan berhasil diperbarui",
@@ -124,14 +232,25 @@ const updateTahapan = async (req, res) => {
 // Tahap 2: Tambah Rapat Pembahasan
 const addPembahasan = async (req, res) => {
     try {
-        const { judul_rapat, tanggal_rapat, keterangan } = req.body;
+        const { judul_rapat, tanggal_rapat, lokasi, keterangan } = req.body;
         const fileNotulensi = req.file?.filename || null;
 
+        if (!judul_rapat || !judul_rapat.trim()) {
+            return res.status(400).json({ success: false, message: "Judul rapat wajib diisi" });
+        }
+        if (!tanggal_rapat) {
+            return res.status(400).json({ success: false, message: "Tanggal rapat wajib diisi" });
+        }
+        if (!fileNotulensi) {
+            return res.status(400).json({ success: false, message: "File PDF hasil rapat wajib diunggah" });
+        }
+
         const result = await pengajuanService.addPembahasan(req.params.id, {
-            judul_rapat,
+            judul_rapat: judul_rapat.trim(),
             tanggal_rapat,
+            lokasi: lokasi ? lokasi.trim() : null,
             file_notulensi: fileNotulensi,
-            keterangan,
+            keterangan: keterangan ? keterangan.trim() : null,
         });
 
         return res.status(201).json({
@@ -298,11 +417,71 @@ const remove = async (req, res) => {
     }
 };
 
+// Download File Pengajuan dengan Watermark JDIH BIN
+const downloadFilePengajuan = async (req, res) => {
+    try {
+        const { id, type } = req.params; // type: draft | akademik | notulensi | final
+        const draft = await pengajuanService.getById(id);
+        if (!draft) {
+            return res.status(404).json({ success: false, message: "Pengajuan tidak ditemukan" });
+        }
+
+        let fileName = "";
+        let originalTitle = draft.judul || "dokumen";
+        if (type === "draft") fileName = draft.file_draft;
+        else if (type === "akademik") fileName = draft.file_naskah_akademik;
+        else if (type === "final") fileName = draft.file_dokumen_final;
+        else fileName = draft.file_draft;
+
+        if (!fileName) {
+            return res.status(404).json({ success: false, message: "File belum tersedia" });
+        }
+
+        const filePath = path.join(__dirname, "../uploads/pengajuan-peraturan", fileName);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ success: false, message: "File fisik tidak ditemukan pada server" });
+        }
+
+        // Ambil info nama user login dari JWT token atau query parameter
+        let userName = "Pengguna JDIH BIN";
+        try {
+            const token = req.cookies?.auth_token || req.headers?.authorization?.replace("Bearer ", "");
+            if (token) {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || "jdih-secret-key-12345");
+                if (decoded && decoded.nama) userName = decoded.nama;
+            }
+        } catch (e) {}
+
+        if (req.query.user) {
+            userName = decodeURIComponent(req.query.user);
+        }
+
+        // Terapkan Watermark JDIH BIN besar miring + timestamp nama
+        const watermarkedPdf = await applyWatermark(filePath, {
+            userName,
+            downloadDate: new Date(),
+        });
+
+        const safeFilename = encodeURIComponent(`${originalTitle}_${type}.pdf`);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
+        res.setHeader("Content-Length", watermarkedPdf.length);
+
+        return res.send(watermarkedPdf);
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Gagal mendownload dokumen ber-watermark: " + error.message,
+        });
+    }
+};
+
 module.exports = {
     getOptions,
     getAll,
     getById,
     create,
+    update,
     updateTahapan,
     addPembahasan,
     deletePembahasan,
@@ -311,6 +490,7 @@ module.exports = {
     updatePersetujuanStatus,
     deletePersetujuan,
     tetapkanDanPublikasikan,
+    downloadFilePengajuan,
     remove,
 };
 

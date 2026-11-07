@@ -307,6 +307,14 @@ export const statusOptions = [
     value: "Tidak Berlaku",
     label: "Tidak Berlaku",
   },
+  {
+    value: "Dicabut",
+    label: "Dicabut",
+  },
+  {
+    value: "Diubah",
+    label: "Diubah",
+  },
 ];
 
 export const getTahunOptions = () => {
@@ -317,7 +325,7 @@ export const getTahunOptions = () => {
     },
   ];
 
-  for (let tahun = 2026; tahun >= 1970; tahun--) {
+  for (let tahun = 2080; tahun >= 1970; tahun--) {
     const tahunStr = String(tahun);
 
     options.push({

@@ -19,8 +19,15 @@ const create = async (data) => {
     return await pengajuanRepo.createDraft(data);
 };
 
-const updateTahap = async (id, tahapan, status) => {
-    return await pengajuanRepo.updateTahapan(id, tahapan, status);
+const update = async (id, data) => {
+    if (!id) throw new Error("ID pengajuan wajib diisi");
+    const existing = await pengajuanRepo.findById(id);
+    if (!existing) throw new Error("Pengajuan peraturan tidak ditemukan");
+    return await pengajuanRepo.updateDraft(id, data);
+};
+
+const updateTahap = async (id, tahapan, status, catatan_verifikasi) => {
+    return await pengajuanRepo.updateTahapan(id, tahapan, status, catatan_verifikasi);
 };
 
 const addPembahasan = async (draftId, data) => {
@@ -67,6 +74,7 @@ module.exports = {
     getAll,
     getById,
     create,
+    update,
     updateTahap,
     addPembahasan,
     deletePembahasan,

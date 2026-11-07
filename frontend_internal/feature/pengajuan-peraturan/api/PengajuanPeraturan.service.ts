@@ -30,6 +30,16 @@ export const createPengajuan = async (
   return res.data.data;
 };
 
+export const updatePengajuan = async (
+  id: number,
+  formData: FormData
+): Promise<PengajuanPeraturan> => {
+  const res = await api.put(`/pengajuan-peraturan/${id}`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data.data;
+};
+
 export const updateTahapanPengajuan = async (
   id: number,
   payload: { tahapan: string; status?: string }

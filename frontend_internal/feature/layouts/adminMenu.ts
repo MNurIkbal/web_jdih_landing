@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Scale,
   FileCheck2,
+  Activity,
   LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,13 @@ export const JDIH_MENU_ITEMS: AdminMenuItem[] = [
     label: "Pengajuan Peraturan",
     href: "/admin/pengajuan-peraturan",
     icon: FileSpreadsheet,
+    module: "JDIH",
+    roles: ["superadmin", "admin", "pengguna"],
+  },
+  {
+    label: "Monitoring Progres",
+    href: "/admin/monitoring-progres",
+    icon: Activity,
     module: "JDIH",
     roles: ["superadmin", "admin", "pengguna"],
   },

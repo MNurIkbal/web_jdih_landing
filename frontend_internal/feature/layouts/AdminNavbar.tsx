@@ -51,8 +51,12 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
     if (logoutMutation.isPending) return;
     try {
       await logoutMutation.mutateAsync();
-      router.replace("/auth");
-    } catch (error) {}
+    } catch (error) {
+    } finally {
+      // Hapus cookie di browser jika ada
+      document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      window.location.href = "/auth";
+    }
   };
 
   const [toast, setToast] = useState({
@@ -314,7 +318,7 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
                         className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
                       >
                         <LogOut size={15} />
-                        {logoutMutation.isPending ? "Keluar..." : "Keluar Sistem"}
+                        {logoutMutation.isPending ? "Logout..." : "Logout"}
                       </button>
                     </div>
                   </div>

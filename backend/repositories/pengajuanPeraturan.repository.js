@@ -1,6 +1,45 @@
 const pool = require("../config/database");
 
+let hasEnsuredColumns = false;
+const ensureDraftColumns = async () => {
+    if (hasEnsuredColumns) return;
+    try {
+        await pool.query(`
+            ALTER TABLE draft_peraturan 
+            ADD COLUMN IF NOT EXISTS bidang VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS tipe_dokumen VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS status_dokumen VARCHAR(100) DEFAULT 'Berlaku',
+            ADD COLUMN IF NOT EXISTS tempat_penetapan VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS subjek VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS subject VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS sumber TEXT,
+            ADD COLUMN IF NOT EXISTS urgensi TEXT,
+            ADD COLUMN IF NOT EXISTS dasar_hukum TEXT,
+            ADD COLUMN IF NOT EXISTS catatan_verifikasi TEXT;
+
+            CREATE TABLE IF NOT EXISTS draft_peraturan_pembahasan (
+                id SERIAL PRIMARY KEY,
+                draft_id INT NOT NULL,
+                judul_rapat VARCHAR(255) NOT NULL,
+                tanggal_rapat DATE NOT NULL,
+                lokasi VARCHAR(255),
+                keterangan TEXT,
+                file_notulensi VARCHAR(255),
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+
+            ALTER TABLE draft_peraturan_pembahasan 
+            ADD COLUMN IF NOT EXISTS lokasi VARCHAR(255);
+        `);
+        hasEnsuredColumns = true;
+    } catch (e) {
+        // Abaikan jika sudah ada atau tabel tidak mengizinkan
+    }
+};
+
 const findAll = async ({ search = "", page = 1, size = 10, tahapan = "" }) => {
+    await ensureDraftColumns();
     const offset = (page - 1) * size;
     let conditions = ["deleted_at IS NULL"];
     let values = [];
@@ -42,6 +81,7 @@ const findAll = async ({ search = "", page = 1, size = 10, tahapan = "" }) => {
 };
 
 const findById = async (id) => {
+    await ensureDraftColumns();
     const draftQuery = `SELECT * FROM draft_peraturan WHERE id = $1 AND deleted_at IS NULL`;
     const draftRes = await pool.query(draftQuery, [id]);
     if (!draftRes.rows[0]) return null;
@@ -61,9 +101,18 @@ const findById = async (id) => {
 };
 
 const createDraft = async (data) => {
+    await ensureDraftColumns();
     const {
         judul,
         kategori,
+        bidang,
+        tipe_dokumen,
+        status_dokumen,
+        tempat_penetapan,
+        subject,
+        sumber,
+        urgensi,
+        dasar_hukum,
         nomor_rancangan,
         tahun,
         pemrakarsa,
@@ -78,16 +127,16 @@ const createDraft = async (data) => {
 
     const query = `
         INSERT INTO draft_peraturan (
-            judul, kategori, nomor_rancangan, tahun,
+            judul, kategori, bidang, tipe_dokumen, status_dokumen, tempat_penetapan, subject, subjek, sumber, urgensi, dasar_hukum, nomor_rancangan, tahun,
             pemrakarsa, penanggung_jawab, tahapan, status,
             tanggal_pengajuan, target_penetapan, ringkasan,
             catatan_revisi, file_draft, file_naskah_akademik,
             dilihat, download, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4,
-            $5, $6, 'Pengajuan', 'Proses',
-            $7, $8, $9,
-            $10, $11, $12,
+            $1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12,
+            $13, $14, 'Pengajuan', 'Draft',
+            $15, $16, $17,
+            $18, $19, $20,
             0, 0, NOW(), NOW()
         ) RETURNING *;
     `;
@@ -95,6 +144,14 @@ const createDraft = async (data) => {
     const values = [
         judul,
         kategori || "Rancangan Peraturan",
+        bidang || null,
+        tipe_dokumen || null,
+        status_dokumen || "Berlaku",
+        tempat_penetapan || null,
+        subject || null,
+        sumber || null,
+        urgensi || null,
+        dasar_hukum || null,
         nomor_rancangan || null,
         tahun ? parseInt(tahun, 10) : new Date().getFullYear(),
         pemrakarsa || null,
@@ -111,32 +168,121 @@ const createDraft = async (data) => {
     return res.rows[0];
 };
 
-const updateTahapan = async (id, tahapan, status) => {
+const updateDraft = async (id, data) => {
+    await ensureDraftColumns();
+    const {
+        judul,
+        kategori,
+        bidang,
+        tipe_dokumen,
+        status_dokumen,
+        tempat_penetapan,
+        subject,
+        sumber,
+        urgensi,
+        dasar_hukum,
+        nomor_rancangan,
+        tahun,
+        pemrakarsa,
+        penanggung_jawab,
+        tanggal_pengajuan,
+        target_penetapan,
+        ringkasan,
+        status,
+        tahapan,
+        file_draft,
+        file_naskah_akademik,
+    } = data;
+
+    const query = `
+        UPDATE draft_peraturan
+        SET
+            judul = COALESCE($2, judul),
+            kategori = COALESCE($3, kategori),
+            bidang = COALESCE($4, bidang),
+            tipe_dokumen = COALESCE($5, tipe_dokumen),
+            status_dokumen = COALESCE($6, status_dokumen),
+            tempat_penetapan = COALESCE($7, tempat_penetapan),
+            subject = COALESCE($8, subject),
+            subjek = COALESCE($8, subjek),
+            sumber = COALESCE($9, sumber),
+            urgensi = COALESCE($10, urgensi),
+            dasar_hukum = COALESCE($11, dasar_hukum),
+            nomor_rancangan = COALESCE($12, nomor_rancangan),
+            tahun = COALESCE($13, tahun),
+            pemrakarsa = COALESCE($14, pemrakarsa),
+            penanggung_jawab = COALESCE($15, penanggung_jawab),
+            tanggal_pengajuan = COALESCE($16, tanggal_pengajuan),
+            target_penetapan = COALESCE($17, target_penetapan),
+            ringkasan = COALESCE($18, ringkasan),
+            status = COALESCE($19, status),
+            tahapan = COALESCE($20, tahapan),
+            file_draft = COALESCE($21, file_draft),
+            file_naskah_akademik = COALESCE($22, file_naskah_akademik),
+            updated_at = NOW()
+        WHERE id = $1 AND deleted_at IS NULL
+        RETURNING *;
+    `;
+
+    const values = [
+        id,
+        judul || null,
+        kategori || null,
+        bidang || null,
+        tipe_dokumen || null,
+        status_dokumen || null,
+        tempat_penetapan || null,
+        subject || null,
+        sumber || null,
+        urgensi || null,
+        dasar_hukum || null,
+        nomor_rancangan || null,
+        tahun ? parseInt(tahun, 10) : null,
+        pemrakarsa || null,
+        penanggung_jawab || null,
+        tanggal_pengajuan || null,
+        target_penetapan || null,
+        ringkasan || null,
+        status || null,
+        tahapan || null,
+        file_draft || null,
+        file_naskah_akademik || null,
+    ];
+
+    const res = await pool.query(query, values);
+    return res.rows[0];
+};
+
+const updateTahapan = async (id, tahapan, status, catatan_verifikasi = null) => {
+    await ensureDraftColumns();
     const query = `
         UPDATE draft_peraturan
         SET tahapan = $2,
             status = COALESCE($3, status),
+            catatan_verifikasi = COALESCE($4, catatan_verifikasi),
             updated_at = NOW()
         WHERE id = $1
         RETURNING *;
     `;
-    const res = await pool.query(query, [id, tahapan, status]);
+    const res = await pool.query(query, [id, tahapan, status, catatan_verifikasi]);
     return res.rows[0];
 };
 
 // Tahap 2: Pembahasan
 const addPembahasan = async (draftId, data) => {
-    const { judul_rapat, tanggal_rapat, file_notulensi, keterangan } = data;
+    await ensureDraftColumns();
+    const { judul_rapat, tanggal_rapat, lokasi, file_notulensi, keterangan } = data;
     const query = `
         INSERT INTO draft_peraturan_pembahasan (
-            draft_id, judul_rapat, tanggal_rapat, file_notulensi, keterangan, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            draft_id, judul_rapat, tanggal_rapat, lokasi, file_notulensi, keterangan, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         RETURNING *;
     `;
     const res = await pool.query(query, [
         draftId,
         judul_rapat,
         tanggal_rapat || new Date(),
+        lokasi || null,
         file_notulensi || null,
         keterangan || null,
     ]);
@@ -345,11 +491,10 @@ const getOptions = async ({ type = "", query = "" } = {}) => {
         status: [
             "Berlaku",
             "Tidak Berlaku",
-            "Draft",
             "Dicabut",
             "Diubah",
         ],
-        tahun: Array.from({ length: 30 }, (_, i) => String(new Date().getFullYear() + 2 - i)),
+        tahun: Array.from({ length: 2080 - 1970 + 1 }, (_, i) => String(2080 - i)),
     };
 
     const searchStr = (query || "").toLowerCase().trim();
@@ -431,6 +576,7 @@ module.exports = {
     findAll,
     findById,
     createDraft,
+    updateDraft,
     updateTahapan,
     addPembahasan,
     removePembahasan,

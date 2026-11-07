@@ -96,7 +96,7 @@ export default function FormSelectSearch({
   // Selected Option object
   const selectedObj = useMemo(() => {
     const all = [...initialOptions, ...apiOptions];
-    return all.find((o) => String(o.value) === String(value)) || null;
+    return all.find((o) => String(o.value).trim().toLowerCase() === String(value).trim().toLowerCase()) || null;
   }, [value, initialOptions, apiOptions]);
 
   const handleSelect = (val: string | number) => {
@@ -186,7 +186,7 @@ export default function FormSelectSearch({
               </div>
             ) : (
               filteredOptions.map((opt) => {
-                const isSelected = String(opt.value) === String(value);
+                const isSelected = String(opt.value).trim().toLowerCase() === String(value).trim().toLowerCase();
                 return (
                   <button
                     key={opt.value}

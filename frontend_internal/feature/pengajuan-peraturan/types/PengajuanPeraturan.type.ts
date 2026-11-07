@@ -6,6 +6,10 @@ export type TahapanPeraturan =
   | "Penetapan";
 
 export type StatusPeraturan =
+  | "Draft"
+  | "Submit Dokumen"
+  | "Review"
+  | "Pengajuan Ulang"
   | "Proses"
   | "Revisi"
   | "Disetujui"
@@ -37,6 +41,10 @@ export interface PengajuanPeraturan {
   id: number;
   judul: string;
   kategori?: string;
+  bidang?: string;
+  tipe_dokumen?: string;
+  tempat_penetapan?: string;
+  status_dokumen?: string;
   nomor_rancangan?: string;
   tahun?: number;
   pemrakarsa?: string;

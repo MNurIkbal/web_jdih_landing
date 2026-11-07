@@ -41,7 +41,7 @@ import {
   useMasterOptions,
   useUpdateDokumenHukum,
 } from "../hooks/DokumenHukum.hooks";
-import { useCreatePengajuan } from "@/feature/pengajuan-peraturan/hooks/PengajuanPeraturan.hooks";
+import { useCreatePengajuan, useUpdatePengajuan } from "@/feature/pengajuan-peraturan/hooks/PengajuanPeraturan.hooks";
 import { fetchMasterOptions } from "../api/DokumenHukum.service";
 import { bidangOptions, kategoriOptions, statusOptions, subjectOptions, tahunOptions, tipeDokumenOptions } from "@/constanta/GlobalConstanta";
 
@@ -76,6 +76,7 @@ export default function DokumenHukumForm({
   const createDokumenHukum = useCreateDokumenHukum();
   const createPengajuan = useCreatePengajuan();
   const updateDokumenHukum = useUpdateDokumenHukum();
+  const updatePengajuan = useUpdatePengajuan();
 
   // Dynamic API Master Options
   const { data: apiKategori } = useMasterOptions("kategori");
@@ -182,50 +183,72 @@ export default function DokumenHukumForm({
     file_dokumen: null,
   });
 
-  const getEditValues = (data: DokumenHukum): DokumenHukumFormValues => ({
-    id: data.id !== undefined && data.id !== null ? Number(data.id) : undefined,
+  const getEditValues = (data: DokumenHukum): DokumenHukumFormValues => {
+    const rawData = data as any;
+    let extractedUrgensi = rawData.urgensi ?? "";
+    let extractedDasarHukum = rawData.dasar_hukum ?? "";
+    let extractedSumber = data.sumber ?? rawData.sumber ?? "";
 
-    judul: data.judul ?? "",
+    // Parse ringkasan jika menyimpan format [URGENSI] ... [DASAR HUKUM] ... [SUMBER/CATATAN] ...
+    if (rawData.ringkasan && (!extractedUrgensi || !extractedSumber)) {
+      const ringkasanText = String(rawData.ringkasan);
+      const matchUrgensi = ringkasanText.match(/\[URGENSI\]\s*([\s\S]*?)(?=\n\n\[DASAR HUKUM\]|$)/i);
+      const matchDasar = ringkasanText.match(/\[DASAR HUKUM\]\s*([\s\S]*?)(?=\n\n\[SUMBER\/CATATAN\]|$)/i);
+      const matchSumber = ringkasanText.match(/\[SUMBER\/CATATAN\]\s*([\s\S]*?)$/i);
 
-    kategori:
-      data.kategori !== undefined && data.kategori !== null
-        ? String(data.kategori)
-        : "",
+      if (matchUrgensi && !extractedUrgensi) extractedUrgensi = matchUrgensi[1].trim();
+      if (matchDasar && !extractedDasarHukum) extractedDasarHukum = matchDasar[1].trim();
+      if (matchSumber && !extractedSumber) extractedSumber = matchSumber[1].trim();
+      if (!matchUrgensi && !matchSumber && !extractedSumber) {
+        extractedSumber = ringkasanText;
+      }
+    }
 
-    nomor: data.nomor ?? "",
-    tahun:
-      data.tahun !== undefined && data.tahun !== null
-        ? String(data.tahun)
-        : "",
-    bidang: data.bidang ?? "",
+    return {
+      id: data.id !== undefined && data.id !== null ? Number(data.id) : undefined,
 
-    tipe_dokumen:
-      data.tipe_dokumen !== undefined && data.tipe_dokumen !== null
-        ? String(data.tipe_dokumen)
-        : "",
+      judul: data.judul ?? "",
 
-    tempat_penetapan: data.tempat_penetapan ?? "",
+      kategori:
+        data.kategori !== undefined && data.kategori !== null
+          ? String(data.kategori)
+          : "",
 
-    tanggal_penetapan: formatDateInput(data.tanggal_penetapan) ?? "",
+      nomor: data.nomor ?? rawData.nomor_rancangan ?? "",
+      tahun:
+        data.tahun !== undefined && data.tahun !== null
+          ? String(data.tahun)
+          : "",
+      bidang: data.bidang ?? rawData.bidang ?? "",
 
-    tanggal_pengundangan: formatDateInput(data.tanggal_pengundangan) ?? "",
+      tipe_dokumen:
+        data.tipe_dokumen !== undefined && data.tipe_dokumen !== null
+          ? String(data.tipe_dokumen)
+          : rawData.tipe_dokumen ?? "",
 
-    tanggal_berlaku: formatDateInput(data.tanggal_berlaku) ?? "",
+      tempat_penetapan: data.tempat_penetapan ?? rawData.tempat_penetapan ?? rawData.pemrakarsa ?? "",
 
-    sumber: data.sumber ?? "",
-    pemrakarsa: (data as any).pemrakarsa ?? "",
-    penanggung_jawab: (data as any).penanggung_jawab ?? "",
-    urgensi: (data as any).urgensi ?? "",
-    dasar_hukum: (data as any).dasar_hukum ?? "",
+      tanggal_penetapan: formatDateInput(data.tanggal_penetapan || rawData.tanggal_pengajuan) ?? "",
 
-    subject: (data as any).subjek ?? "",
+      tanggal_pengundangan: formatDateInput(data.tanggal_pengundangan || rawData.tanggal_pengajuan) ?? "",
 
-    status: data.status ?? "",
+      tanggal_berlaku: formatDateInput(data.tanggal_berlaku || rawData.target_penetapan) ?? "",
 
-    file_abstrak: data.file_abstrak ?? null,
+      sumber: extractedSumber,
+      pemrakarsa: rawData.pemrakarsa ?? "",
+      penanggung_jawab: rawData.penanggung_jawab ?? "",
+      urgensi: extractedUrgensi,
+      dasar_hukum: extractedDasarHukum,
 
-    file_dokumen: data.file_dokumen ?? null,
-  });
+      subject: rawData.subject ?? rawData.subjek ?? "",
+
+      status: rawData.status_dokumen ?? (rawData.status === "Berlaku" || rawData.status === "Tidak Berlaku" || rawData.status === "Dicabut" || rawData.status === "Diubah" ? rawData.status : "Berlaku"),
+
+      file_abstrak: data.file_abstrak ?? rawData.file_naskah_akademik ?? null,
+
+      file_dokumen: data.file_dokumen ?? rawData.file_draft ?? null,
+    };
+  };
 
   useEffect(() => {
     if (isEdit && data) {
@@ -292,10 +315,18 @@ export default function DokumenHukumForm({
         const pengajuanFormData = new FormData();
         pengajuanFormData.append("judul", values.judul.trim());
         pengajuanFormData.append("kategori", values.kategori);
+        pengajuanFormData.append("bidang", values.bidang || "");
+        pengajuanFormData.append("tipe_dokumen", values.tipe_dokumen || "");
+        pengajuanFormData.append("status_dokumen", values.status || "Berlaku");
+        pengajuanFormData.append("tempat_penetapan", values.tempat_penetapan?.trim() || "");
+        pengajuanFormData.append("subject", values.subject?.trim() || "");
+        pengajuanFormData.append("sumber", values.sumber?.trim() || "");
+        pengajuanFormData.append("urgensi", values.urgensi?.trim() || "");
+        pengajuanFormData.append("dasar_hukum", values.dasar_hukum?.trim() || "");
         pengajuanFormData.append("nomor_rancangan", values.nomor.trim());
         pengajuanFormData.append("tahun", String(values.tahun));
         pengajuanFormData.append("pemrakarsa", values.pemrakarsa?.trim() || values.tempat_penetapan?.trim() || "Biro Hukum");
-        pengajuanFormData.append("penanggung_jawab", values.penanggung_jawab?.trim() || values.subject?.trim() || "Biro Hukum");
+        pengajuanFormData.append("penanggung_jawab", values.penanggung_jawab?.trim() || "Biro Hukum");
         pengajuanFormData.append("tanggal_pengajuan", values.tanggal_pengundangan || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
         pengajuanFormData.append("target_penetapan", values.tanggal_berlaku || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
         pengajuanFormData.append(
@@ -352,8 +383,57 @@ export default function DokumenHukumForm({
     const dokumenId = Number(values.id);
 
     if (!Number.isInteger(dokumenId) || dokumenId <= 0) {
-      toast.error("ID DokumenHukum tidak valid");
+      toast.error("ID Dokumen / Pengajuan tidak valid");
+      return;
+    }
 
+    if (targetApi === "pengajuan-peraturan") {
+      const pengajuanFormData = new FormData();
+      pengajuanFormData.append("judul", values.judul.trim());
+      pengajuanFormData.append("kategori", values.kategori);
+      pengajuanFormData.append("bidang", values.bidang || "");
+      pengajuanFormData.append("tipe_dokumen", values.tipe_dokumen || "");
+      pengajuanFormData.append("status_dokumen", values.status || "Berlaku");
+      pengajuanFormData.append("tempat_penetapan", values.tempat_penetapan?.trim() || "");
+      pengajuanFormData.append("subject", values.subject?.trim() || "");
+      pengajuanFormData.append("sumber", values.sumber?.trim() || "");
+      pengajuanFormData.append("urgensi", values.urgensi?.trim() || "");
+      pengajuanFormData.append("dasar_hukum", values.dasar_hukum?.trim() || "");
+      pengajuanFormData.append("nomor_rancangan", values.nomor.trim());
+      pengajuanFormData.append("tahun", String(values.tahun));
+      pengajuanFormData.append("pemrakarsa", values.pemrakarsa?.trim() || values.tempat_penetapan?.trim() || "Biro Hukum");
+      pengajuanFormData.append("penanggung_jawab", values.penanggung_jawab?.trim() || "Biro Hukum");
+      pengajuanFormData.append("tanggal_pengajuan", values.tanggal_pengundangan || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
+      pengajuanFormData.append("target_penetapan", values.tanggal_berlaku || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
+      pengajuanFormData.append(
+        "ringkasan",
+        values.urgensi?.trim()
+          ? `[URGENSI]\n${values.urgensi.trim()}\n\n[DASAR HUKUM]\n${values.dasar_hukum?.trim() || "-"}\n\n[SUMBER/CATATAN]\n${values.sumber?.trim() || "-"}`
+          : values.sumber?.trim() || values.judul.trim()
+      );
+
+      if (values.file_dokumen instanceof File) {
+        pengajuanFormData.append("file_draft", values.file_dokumen);
+        pengajuanFormData.append("file_dokumen", values.file_dokumen);
+      }
+      if (values.file_abstrak instanceof File) {
+        pengajuanFormData.append("file_naskah_akademik", values.file_abstrak);
+        pengajuanFormData.append("file_abstrak", values.file_abstrak);
+      }
+
+      updatePengajuan.mutate(
+        { id: dokumenId, formData: pengajuanFormData },
+        {
+          onSuccess: (response: any) => {
+            toast.success(response?.message ?? "Pengajuan peraturan berhasil diperbarui");
+            onSuccess?.();
+          },
+          onError: (error: any) => {
+            const message = getErrorMessage(error);
+            toast.error(message);
+          },
+        }
+      );
       return;
     }
 
@@ -375,8 +455,6 @@ export default function DokumenHukumForm({
           const message = getErrorMessage(error);
 
           toast.error(message);
-
-
         },
       },
     );
@@ -837,7 +915,7 @@ export default function DokumenHukumForm({
 
               <FormInput
                 type="text"
-                label="Penanggung Jawab Substansi (PIC)"
+                label="Penanggung Jawab Substansi"
                 placeholder="Contoh: Tim Pokja Regulasi / Nama Pejabat Terkait"
                 {...register("penanggung_jawab")}
                 error={errors.penanggung_jawab?.message}
@@ -1006,13 +1084,15 @@ export default function DokumenHukumForm({
 
           {/* STATUS */}
           <FormSelectSearch
-            label="Status"
+            label="Status Dokumen"
             required
             value={watch("status")}
             onChange={(val) => {
               setValue("status", val, { shouldValidate: true, shouldDirty: true });
             }}
-            options={apiStatus && apiStatus.length > 0 ? apiStatus : statusOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }))}
+            options={(apiStatus && apiStatus.length > 0 ? apiStatus : statusOptions)
+              .filter((o) => o.value && o.value.toLowerCase() !== "draft")
+              .map((o) => ({ value: o.value, label: o.label }))}
             onSearchApi={(q) => fetchMasterOptions("status", q)}
             placeholder="Pilih status..."
             searchPlaceholder="Cari status..."
@@ -1089,7 +1169,7 @@ export default function DokumenHukumForm({
         >
           <FileUpload
             name="file_abstrak"
-            label="File Abstrak / Berkas Pendukung"
+            label="File Abstrak"
             value={fileAbstrak}
             error={errors.file_abstrak?.message}
             required={!isEdit}
@@ -1097,7 +1177,7 @@ export default function DokumenHukumForm({
 
           <FileUpload
             name="file_dokumen"
-            label="File Dokumen Peraturan (PDF)"
+            label="File Dokumen Peraturan"
             value={fileDokumen}
             error={errors.file_dokumen?.message}
             required={!isEdit}

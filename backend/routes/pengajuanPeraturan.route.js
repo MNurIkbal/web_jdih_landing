@@ -2,14 +2,17 @@ const express = require("express");
 const router = express.Router();
 const pengajuanController = require("../controllers/pengajuanPeraturan.controller");
 const upload = require("../middleware/pengajuanPeraturanUpload");
+const { requireRole } = require("../middleware/rbacMiddleware");
 
 router.get("/options", pengajuanController.getOptions);
 router.get("/", pengajuanController.getAll);
 router.get("/:id", pengajuanController.getById);
+router.get("/:id/download-file/:type", pengajuanController.downloadFilePengajuan);
 
-// Tahap 1: Pengajuan Baru
+// Tahap 1: Pengajuan Baru (Admin dilarang create, hanya pengguna & superadmin)
 router.post(
     "/",
+    requireRole("superadmin", "pengguna"),
     upload.fields([
         { name: "file_draft", maxCount: 1 },
         { name: "file_dokumen", maxCount: 1 },
@@ -17,6 +20,19 @@ router.post(
         { name: "file_abstrak", maxCount: 1 },
     ]),
     pengajuanController.create
+);
+
+// Update Pengajuan Peraturan (Admin dilarang update, hanya pengguna & superadmin)
+router.put(
+    "/:id",
+    requireRole("superadmin", "pengguna"),
+    upload.fields([
+        { name: "file_draft", maxCount: 1 },
+        { name: "file_dokumen", maxCount: 1 },
+        { name: "file_naskah_akademik", maxCount: 1 },
+        { name: "file_abstrak", maxCount: 1 },
+    ]),
+    pengajuanController.update
 );
 
 // Update tahapan langsung jika dibutuhkan
@@ -49,8 +65,8 @@ router.post(
     pengajuanController.tetapkanDanPublikasikan
 );
 
-// Soft delete
-router.delete("/:id", pengajuanController.remove);
+// Soft delete (Admin dilarang delete, hanya pengguna & superadmin)
+router.delete("/:id", requireRole("superadmin", "pengguna"), pengajuanController.remove);
 
 module.exports = router;
 

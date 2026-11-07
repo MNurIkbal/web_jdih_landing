@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import AdminNavbar from "./AdminNavbar";
 import AdminSidebar from "./AdminSidebar";
 import AdminFooter from "./AdminFooter";
 import { AdminLayoutProvider, useAdminLayout } from "./AdminLayoutContext";
-import { Scale, FileText, Loader2 } from "lucide-react";
+import { Scale, FileText, Loader2, ShieldAlert } from "lucide-react";
+import { SessionHook } from "../web";
 
 interface AdminLayoutWrapperProps {
   children: React.ReactNode;
@@ -14,6 +16,57 @@ interface AdminLayoutWrapperProps {
 function AdminLayoutInner({ children }: AdminLayoutWrapperProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { menuMode, isSwitchingModule, switchingTarget, activeModule } = useAdminLayout();
+  const pathname = usePathname();
+  const router = useRouter();
+  const session = SessionHook();
+  const userRole = (session?.data?.data?.role || "").toLowerCase();
+
+  // 1. Auth Guard: Jika belum login atau session error/tidak ada, lempar ke /auth
+  const isUnauthenticated = !session.isLoading && (!session.data?.success || !session.data?.data);
+
+  useEffect(() => {
+    if (isUnauthenticated) {
+      router.replace("/auth");
+    }
+  }, [isUnauthenticated, router]);
+
+  // 2. Role Protection:
+  // - /admin/pengguna & /admin/pengaturan HANYA boleh diakses oleh superadmin
+  // - Admin (verifikator) dan Pengguna tidak boleh akses
+  const isSuperadminOnlyRoute =
+    pathname.startsWith("/admin/pengguna") || pathname.startsWith("/admin/pengaturan");
+  const isForbiddenForCurrentRole =
+    !session.isLoading && userRole && userRole !== "superadmin" && isSuperadminOnlyRoute;
+
+  useEffect(() => {
+    if (isForbiddenForCurrentRole) {
+      router.replace("/admin/dashboard");
+    }
+  }, [isForbiddenForCurrentRole, router]);
+
+  // Loading screen saat session masih diperiksa
+  if (session.isLoading || isUnauthenticated) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-slate-900 text-white p-6">
+        <Loader2 size={36} className="animate-spin text-blue-500 mb-3" />
+        <p className="text-xs text-slate-400">Memeriksa sesi login...</p>
+      </div>
+    );
+  }
+
+  if (isForbiddenForCurrentRole) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-slate-900 text-white p-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-500 ring-4 ring-rose-500/20 mb-4 animate-bounce">
+          <ShieldAlert size={36} />
+        </div>
+        <h2 className="text-xl font-bold text-slate-100">Akses Ditolak (403 Forbidden)</h2>
+        <p className="mt-1 text-xs text-slate-400 text-center max-w-sm">
+          Menu ini hanya dapat diakses oleh Superadmin. Mengalihkan Anda kembali ke Dashboard...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-[#F8FAFC]">

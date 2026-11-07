@@ -101,4 +101,21 @@ export const PengajuanPeraturanSchema = z.object({
 
 export type PengajuanPeraturanFormValues = z.infer<typeof PengajuanPeraturanSchema>;
 
+export const VerifikasiPengajuanSchema = z.object({
+  status: z.enum(["Disetujui", "Ditolak"], {
+    errorMap: () => ({ message: "Pilih keputusan verifikasi" }),
+  }),
+  catatan: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.status === "Ditolak" && (!data.catatan || !data.catatan.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["catatan"],
+      message: "Catatan penolakan / revisi wajib diisi jika permohonan ditolak",
+    });
+  }
+});
+
+export type VerifikasiPengajuanFormValues = z.infer<typeof VerifikasiPengajuanSchema>;
+
 

@@ -15,6 +15,15 @@ import {
   FileCheck,
   ExternalLink,
   Search,
+  MoreVertical,
+  Eye,
+  X,
+  Download,
+  Info,
+  Layers,
+  MapPin,
+  Clock,
+  BookOpen,
 } from "lucide-react";
 import { APP_BASE_URL } from "@/constanta/GlobalConstanta";
 
@@ -22,18 +31,9 @@ import DataTable, {
   type DataTableColumn,
 } from "@/components/ui/DataTable";
 
-import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
-import DokumenHukumDrawer from "@/components/ui/Drawer";
 import Toast from "@/components/ui/Toast";
-
-import DokumenHukumForm from "./DokumenHukumForm";
-
 import { DokumenHukum } from "../types/DokumenHukum.type";
-
-import {
-  useDeleteDokumenHukum,
-  useDokumenHukumList,
-} from "../hooks/DokumenHukum.hooks";
+import { useDokumenHukumList } from "../hooks/DokumenHukum.hooks";
 
 /**
  * ============================================================
@@ -146,30 +146,8 @@ function DokumenHukumContent() {
     message: "",
   });
 
-  /**
-   * ============================================================
-   * DRAWER
-   * ============================================================
-   */
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const [drawerMode, setDrawerMode] =
-    useState<"create" | "edit">("create");
-
-  const [selectedDokumenHukum, setSelectedDokumenHukum] =
-    useState<DokumenHukum | null>(null);
-
-  /**
-   * ============================================================
-   * DELETE
-   * ============================================================
-   */
-
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const [deleteData, setDeleteData] =
-    useState<DokumenHukum | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<number | string | null>(null);
+  const [detailModalData, setDetailModalData] = useState<DokumenHukum | null>(null);
 
   /**
    * ============================================================
@@ -177,7 +155,6 @@ function DokumenHukumContent() {
    * ============================================================
    * Hanya menampilkan dokumen hukum yang telah selesai dipublikasi/berlaku
    */
-
   const params = {
     page,
     size,
@@ -191,15 +168,12 @@ function DokumenHukumContent() {
    * FETCH DATA
    * ============================================================
    */
-
   const {
     data: response,
     isLoading,
     isFetching,
     refetch,
   } = useDokumenHukumList(params);
-
-  const deleteMutation = useDeleteDokumenHukum();
 
   /**
    * ============================================================
@@ -337,130 +311,6 @@ function DokumenHukumContent() {
     );
   };
 
-  /**
-   * ============================================================
-   * CREATE
-   * ============================================================
-   */
-
-  const handleCreate = () => {
-    setSelectedDokumenHukum(null);
-
-    setDrawerMode("create");
-
-    setDrawerOpen(true);
-  };
-
-  /**
-   * ============================================================
-   * EDIT
-   * ============================================================
-   */
-
-  const handleEdit = (
-    row: DokumenHukum
-  ) => {
-    setSelectedDokumenHukum(row);
-
-    setDrawerMode("edit");
-
-    setDrawerOpen(true);
-  };
-
-  /**
-   * ============================================================
-   * VIEW
-   * ============================================================
-   */
-
-  const handleView = (
-    row: DokumenHukum
-  ) => {
-    
-  };
-
-
-  const handleDelete = (
-    row: DokumenHukum
-  ) => {
-    if (
-      row.id === undefined ||
-      row.id === null
-    ) {
-      setToast({
-        open: true,
-        type: "error",
-        title: "Gagal",
-        message:
-          "ID Dokumen Hukum tidak ditemukan.",
-      });
-
-      return;
-    }
-
-    setDeleteData(row);
-
-    setDeleteOpen(true);
-  };
-
-  /**
-   * ============================================================
-   * CONFIRM DELETE
-   * ============================================================
-   */
-
-  const confirmDelete = () => {
-    if (
-      deleteData?.id === undefined ||
-      deleteData?.id === null
-    ) {
-      setToast({
-        open: true,
-        type: "error",
-        title: "Gagal",
-        message:
-          "ID Dokumen Hukum tidak ditemukan.",
-      });
-
-      return;
-    }
-
-    deleteMutation.mutate(
-      deleteData.id,
-      {
-        onSuccess: () => {
-          setDeleteOpen(false);
-
-          setDeleteData(null);
-
-          refetch();
-
-          setToast({
-            open: true,
-            type: "success",
-            title: "Berhasil",
-            message:
-              "Dokumen Hukum berhasil dihapus.",
-          });
-        },
-
-        onError: (error: any) => {
-          
-
-          setToast({
-            open: true,
-            type: "error",
-            title: "Gagal",
-            message:
-              error?.response?.data
-                ?.message ??
-              "Dokumen Hukum gagal dihapus.",
-          });
-        },
-      }
-    );
-  };
-
   const columns: DataTableColumn<DokumenHukum>[] = useMemo(
     () => [
       {
@@ -569,8 +419,62 @@ function DokumenHukumContent() {
           );
         },
       },
+      {
+        key: "aksi",
+        label: "Aksi",
+        width: "100px",
+        align: "center",
+        render: (_val, row) => {
+          return (
+            <div className="relative inline-block text-left">
+              <button
+                type="button"
+                onClick={() => setOpenDropdownId(openDropdownId === row.id ? null : row.id)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition shadow-xs cursor-pointer"
+                title="Pilihan Aksi"
+              >
+                <MoreVertical size={16} />
+              </button>
+
+              {openDropdownId === row.id && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setOpenDropdownId(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDetailModalData(row);
+                        setOpenDropdownId(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                    >
+                      <Eye size={14} className="text-blue-600" />
+                      <span>Detail Dokumen</span>
+                    </button>
+                    {row.file_dokumen && (
+                      <a
+                        href={`${APP_BASE_URL}/uploads/dokumen-hukum/${row.file_dokumen}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setOpenDropdownId(null)}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                      >
+                        <FileText size={14} className="text-slate-500" />
+                        <span>Unduh PDF</span>
+                      </a>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        },
+      },
     ],
-    []
+    [openDropdownId]
   );
 
   /**
@@ -596,16 +500,6 @@ function DokumenHukumContent() {
           description="Daftar resmi peraturan perundang-undangan dan produk hukum yang telah selesai diverifikasi, diundangkan, dan berstatus Berlaku / Publikasi."
 
           searchPlaceholder="Cari dokumen hukum..."
-
-          actions={{
-            view: handleView,
-            edit: handleEdit,
-            delete: handleDelete,
-          }}
-
-          addButtonText="Tambah Dokumen Hukum"
-
-          onAdd={handleCreate}
 
           onRefresh={refetch}
 
@@ -647,7 +541,6 @@ function DokumenHukumContent() {
            */
 
           onPageChange={(newPage) => {
-            
             if (
               newPage < 0 ||
               newPage >= totalPages
@@ -711,94 +604,205 @@ function DokumenHukumContent() {
       </div>
 
       {/* ======================================================
-          DRAWER
+          MODAL DETAIL DOKUMEN HUKUM
       ====================================================== */}
+      {detailModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setDetailModalData(null)}
+          />
 
-      <DokumenHukumDrawer
-        open={drawerOpen}
-        mode={drawerMode}
-        width="full"
-        scrollable={true}
+          {/* Modal Container */}
+          <div className="relative z-10 w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-5">
+              <div className="space-y-1 pr-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700">
+                    <FileText size={13} />
+                    {detailModalData.kategori || "Peraturan"}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <CheckCircle2 size={13} />
+                    {detailModalData.status || "Publikasi (Berlaku)"}
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 leading-snug pt-1">
+                  {detailModalData.judul}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailModalData(null)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+                aria-label="Tutup Detail"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-        onClose={() => {
-          if (
-            deleteMutation.isPending
-          ) {
-            return;
-          }
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+              {/* Section 1: Data Identitas Peraturan */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                  <Info size={14} className="text-blue-600" />
+                  Identitas Dokumen
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 rounded-xl bg-slate-50/80 p-4 border border-slate-100">
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Nomor</span>
+                    <span className="text-sm font-bold text-slate-800">{detailModalData.nomor || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tahun</span>
+                    <span className="text-sm font-bold text-slate-800">{detailModalData.tahun || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tipe Dokumen</span>
+                    <span className="text-sm font-semibold text-slate-800">{detailModalData.tipe_dokumen || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Bidang Hukum</span>
+                    <span className="text-sm font-semibold text-slate-800">{detailModalData.bidang || "-"}</span>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Subjek Dokumen</span>
+                    <span className="text-sm font-semibold text-slate-800">{detailModalData.subject || "-"}</span>
+                  </div>
+                </div>
+              </div>
 
-          setDrawerOpen(false);
+              {/* Section 2: Penetapan & Pengundangan */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                  <Calendar size={14} className="text-blue-600" />
+                  Penetapan & Pengundangan
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 rounded-xl bg-slate-50/80 p-4 border border-slate-100">
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tempat Penetapan</span>
+                    <span className="text-sm font-medium text-slate-800">{detailModalData.tempat_penetapan || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tgl Penetapan</span>
+                    <span className="text-sm font-medium text-slate-800">
+                      {detailModalData.tanggal_penetapan ? String(detailModalData.tanggal_penetapan).split("T")[0] : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tgl Pengundangan</span>
+                    <span className="text-sm font-medium text-slate-800">
+                      {detailModalData.tanggal_pengundangan ? String(detailModalData.tanggal_pengundangan).split("T")[0] : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tgl Berlaku</span>
+                    <span className="text-sm font-medium text-slate-800">
+                      {detailModalData.tanggal_berlaku ? String(detailModalData.tanggal_berlaku).split("T")[0] : "-"}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-          setSelectedDokumenHukum(
-            null
-          );
-        }}
+              {/* Section 3: Sumber */}
+              {detailModalData.sumber && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                    <BookOpen size={14} className="text-blue-600" />
+                    Sumber Dokumen
+                  </h4>
+                  <div className="rounded-xl bg-slate-50/80 p-3.5 border border-slate-100 text-sm text-slate-700">
+                    {detailModalData.sumber}
+                  </div>
+                </div>
+              )}
 
-        onSubmit={(event) => {
-          event.preventDefault();
-        }}
-      >
-        <DokumenHukumForm
-          mode={drawerMode}
+              {/* Section 4: Berkas Dokumen PDF */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                  <FileCheck size={14} className="text-blue-600" />
+                  Berkas Terkait
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* File Dokumen Utama */}
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0 pr-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                        <FileText size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 truncate">
+                          File Dokumen Utama
+                        </div>
+                        <div className="text-xs text-slate-400 truncate">
+                          {detailModalData.file_dokumen || "Tidak ada berkas"}
+                        </div>
+                      </div>
+                    </div>
+                    {detailModalData.file_dokumen && (
+                      <a
+                        href={`${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_dokumen}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Buka</span>
+                      </a>
+                    )}
+                  </div>
 
-          data={
-            selectedDokumenHukum
-          }
+                  {/* File Abstrak */}
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0 pr-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                        <FileCheck size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 truncate">
+                          File Abstrak
+                        </div>
+                        <div className="text-xs text-slate-400 truncate">
+                          {detailModalData.file_abstrak || "Tidak ada berkas abstrak"}
+                        </div>
+                      </div>
+                    </div>
+                    {detailModalData.file_abstrak && (
+                      <a
+                        href={`${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_abstrak}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Buka</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          onSuccess={() => {
-            setDrawerOpen(false);
-
-            setSelectedDokumenHukum(
-              null
-            );
-
-            refetch();
-
-            setToast({
-              open: true,
-              type: "success",
-              title: "Berhasil",
-              message:
-                drawerMode === "create"
-                  ? "Dokumen Hukum berhasil ditambahkan."
-                  : "Dokumen Hukum berhasil diperbarui.",
-            });
-          }}
-        />
-      </DokumenHukumDrawer>
-
-      {/* ======================================================
-          DELETE MODAL
-      ====================================================== */}
-
-      <ConfirmDeleteModal
-        open={deleteOpen}
-        title="Hapus Dokumen Hukum"
-        description="Apakah Anda yakin ingin menghapus data ini?"
-
-        loading={
-          deleteMutation.isPending
-        }
-
-        onClose={() => {
-          if (
-            !deleteMutation.isPending
-          ) {
-            setDeleteOpen(false);
-
-            setDeleteData(null);
-          }
-        }}
-
-        onConfirm={
-          confirmDelete
-        }
-      />
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setDetailModalData(null)}
+                className="rounded-xl border border-slate-300 bg-white px-5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition shadow-xs cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ======================================================
           TOAST
       ====================================================== */}
-
       <Toast
         open={toast.open}
         type={toast.type}

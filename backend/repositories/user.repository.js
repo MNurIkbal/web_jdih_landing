@@ -190,6 +190,7 @@ const update = async (
     {
         nama,
         email,
+        role,
         foto,
     }
 ) => {
@@ -202,7 +203,35 @@ const update = async (
             SET
                 nama = $1,
                 email = $2,
-                foto = $3,
+                role = COALESCE($3, role),
+                foto = $4,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $5
+              AND deleted_at IS NULL
+            RETURNING
+                id,
+                nama,
+                email,
+                role,
+                foto,
+                created_at,
+                updated_at
+        `;
+
+        params = [
+            nama,
+            email,
+            role || null,
+            foto,
+            id,
+        ];
+    } else {
+        query = `
+            UPDATE users
+            SET
+                nama = $1,
+                email = $2,
+                role = COALESCE($3, role),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = $4
               AND deleted_at IS NULL
@@ -219,31 +248,7 @@ const update = async (
         params = [
             nama,
             email,
-            foto,
-            id,
-        ];
-    } else {
-        query = `
-            UPDATE users
-            SET
-                nama = $1,
-                email = $2,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3
-              AND deleted_at IS NULL
-            RETURNING
-                id,
-                nama,
-                email,
-                role,
-                foto,
-                created_at,
-                updated_at
-        `;
-
-        params = [
-            nama,
-            email,
+            role || null,
             id,
         ];
     }

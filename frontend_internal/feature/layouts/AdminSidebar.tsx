@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X, ShieldCheck, Scale, FileText } from "lucide-react";
 import Image from "next/image";
-import { JDIH_MENU_ITEMS, HDH_MENU_ITEMS } from "./adminMenu";
+import { JDIH_MENU_ITEMS, HDH_MENU_ITEMS, filterMenuItemsByRole } from "./adminMenu";
 import { useAdminLayout } from "./AdminLayoutContext";
+import { SessionHook } from "../web";
 
 interface AdminSidebarProps {
   open?: boolean;
@@ -18,14 +19,17 @@ export default function AdminSidebar({
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const { menuMode, activeModule, setActiveModule, isSwitchingModule, switchingTarget } = useAdminLayout();
+  const sessionHooks = SessionHook();
+  const userRole = sessionHooks?.data?.data?.role || "superadmin";
 
   // Jika mode "navbar" aktif, sidebar disembunyikan/ditiadakan
   if (menuMode === "navbar") {
     return null;
   }
 
-  // Pilih daftar menu berdasarkan modul aktif (JDIH atau HDH)
-  const currentMenuItems = activeModule === "HDH" ? HDH_MENU_ITEMS : JDIH_MENU_ITEMS;
+  // Pilih daftar menu berdasarkan modul aktif & hak akses role
+  const rawMenuItems = activeModule === "HDH" ? HDH_MENU_ITEMS : JDIH_MENU_ITEMS;
+  const currentMenuItems = filterMenuItemsByRole(rawMenuItems, userRole);
 
   return (
     <>

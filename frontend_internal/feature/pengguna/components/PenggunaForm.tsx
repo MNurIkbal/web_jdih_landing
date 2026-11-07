@@ -86,6 +86,9 @@ export default function PenggunaForm({
         email:
           data.email ?? "",
 
+        role:
+          (data.role as any) ?? "pengguna",
+
         password: "",
 
         foto:
@@ -101,6 +104,7 @@ export default function PenggunaForm({
       id: undefined,
       nama: "",
       email: "",
+      role: "pengguna",
       password: "",
       foto: null,
     });
@@ -159,6 +163,11 @@ export default function PenggunaForm({
     formData.append(
       "email",
       values.email.trim()
+    );
+
+    formData.append(
+      "role",
+      values.role || "pengguna"
     );
 
     /*
@@ -421,6 +430,24 @@ export default function PenggunaForm({
           isSubmitting
         }
       />
+
+      <div className="space-y-1">
+        <label className="block text-xs font-semibold text-slate-700">
+          Role Akses *
+        </label>
+        <select
+          {...register("role")}
+          disabled={isSubmitting}
+          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+        >
+          <option value="pengguna">Pengguna (Pembuat Pengajuan & Dokumen Hukum)</option>
+          <option value="admin">Admin (Verifikator Semua Menu kecuali Pengguna & Pengaturan)</option>
+          <option value="superadmin">Superadmin (Akses Penuh Semua Menu)</option>
+        </select>
+        {errors.role && (
+          <p className="text-xs text-rose-500">{errors.role.message}</p>
+        )}
+      </div>
 
       {!isEdit && (
         <FormInput

@@ -45,6 +45,18 @@ export const DokumenHukumSchema = z.object({
   sumber: z
     .string().optional(),
 
+  pemrakarsa: z
+    .string().optional(),
+
+  penanggung_jawab: z
+    .string().optional(),
+
+  urgensi: z
+    .string().optional(),
+
+  dasar_hukum: z
+    .string().optional(),
+
   subject: z
     .string().optional(),
 

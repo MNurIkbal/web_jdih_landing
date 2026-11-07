@@ -40,3 +40,25 @@ export const deleteDokumenHukum = async (
 ): Promise<void> => {
   await api.delete(`/dokumen-hukum/${id}`);
 };
+
+export const fetchMasterOptions = async (
+  type: string,
+  query: string = ""
+): Promise<{ value: string; label: string }[]> => {
+  try {
+    const res = await api.get("/pengajuan-peraturan/options", {
+      params: { type, query },
+    });
+    return res.data.data || [];
+  } catch {
+    try {
+      const publicApi = createApiClient("/web");
+      const resWeb = await publicApi.get("/dokumen-hukum/master-options", {
+        params: { type, query },
+      });
+      return resWeb.data.data || [];
+    } catch {
+      return [];
+    }
+  }
+};

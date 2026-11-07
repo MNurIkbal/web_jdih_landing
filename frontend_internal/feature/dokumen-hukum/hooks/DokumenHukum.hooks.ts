@@ -6,6 +6,7 @@ import {
   deleteDokumenHukum,
   fetchByIdDokumenHukum,
   fetchDokumenHukum,
+  fetchMasterOptions,
   useupdateDokumenHukum,
 } from "../api/DokumenHukum.service";
 
@@ -99,3 +100,12 @@ export const useDeleteDokumenHukum = () => {
     },
   });
 };
+
+export const useMasterOptions = (type: string, query: string = "") => {
+  return useQuery({
+    queryKey: ["MasterOptions", type, query],
+    queryFn: () => fetchMasterOptions(type, query),
+    staleTime: 5 * 60 * 1000,
+  });
+};
+

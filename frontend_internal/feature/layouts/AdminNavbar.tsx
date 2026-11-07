@@ -18,7 +18,7 @@ import { useState } from "react";
 import { useUpdatePassword } from "../pengguna/hooks/Pengguna.hooks";
 import Toast from "@/components/ui/Toast";
 import { LogoutHook, SessionHook } from "../web";
-import { JDIH_MENU_ITEMS, HDH_MENU_ITEMS } from "./adminMenu";
+import { JDIH_MENU_ITEMS, HDH_MENU_ITEMS, filterMenuItemsByRole } from "./adminMenu";
 import { useAdminLayout } from "./AdminLayoutContext";
 
 interface AdminNavbarProps {
@@ -29,7 +29,12 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { menuMode, setMenuMode, activeModule, setActiveModule, isSwitchingModule, switchingTarget } = useAdminLayout();
-  const currentMenuItems = activeModule === "HDH" ? HDH_MENU_ITEMS : JDIH_MENU_ITEMS;
+  const logoutMutation = LogoutHook();
+  const sessionHooks = SessionHook();
+  const userRole = sessionHooks?.data?.data?.role || "superadmin";
+
+  const rawMenuItems = activeModule === "HDH" ? HDH_MENU_ITEMS : JDIH_MENU_ITEMS;
+  const currentMenuItems = filterMenuItemsByRole(rawMenuItems, userRole);
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -39,8 +44,6 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const logoutMutation = LogoutHook();
-  const sessionHooks = SessionHook();
   const nama = sessionHooks ? (sessionHooks.data?.data?.nama ?? "Admin") : "";
   const id_data = sessionHooks ? (sessionHooks.data?.data?.id ?? "Administrator") : "";
 

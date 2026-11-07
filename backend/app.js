@@ -15,6 +15,8 @@ const surveyRoutes = require("./routes/survey.routes");
 const authRoutes = require("./routes/auth.route");
 const WebRoute = require("./routes/web.route");
 const authMiddleware = require("./middleware/authMiddleware");
+const { requireRole } = require("./middleware/rbacMiddleware");
+const { cacheMiddleware } = require("./config/redis");
 
 const app = express();
 
@@ -83,23 +85,35 @@ app.use(
 );
 
 app.use("/api/master-data/login", authRoutes);
-app.use("/api/web",WebRoute);
+app.use("/api/web", cacheMiddleware("web", 120), WebRoute);
 
-app.use("/api/master-data/slider",authMiddleware, sliderRoutes);
+// Pengajuan Peraturan & Dokumen Hukum dapat diakses oleh: superadmin, admin (verifikator), dan pengguna (pembuat pengajuan)
+app.use(
+  "/api/master-data/dokumen-hukum",
+  authMiddleware,
+  requireRole("superadmin", "admin", "pengguna"),
+  cacheMiddleware("dokumen-hukum", 180),
+  dokumenHukumRoute
+);
 
-app.use("/api/master-data/berita",authMiddleware, beritaRoutes);
+app.use(
+  "/api/master-data/pengajuan-peraturan",
+  authMiddleware,
+  requireRole("superadmin", "admin", "pengguna"),
+  cacheMiddleware("pengajuan", 60),
+  pengajuanPeraturanRoute
+);
 
-app.use("/api/master-data/kontak",authMiddleware, kontakRoute);
+// Menu CMS konten & data master: dapat diakses oleh superadmin & admin (verifikator)
+app.use("/api/master-data/slider", authMiddleware, requireRole("superadmin", "admin"), sliderRoutes);
+app.use("/api/master-data/berita", authMiddleware, requireRole("superadmin", "admin"), beritaRoutes);
+app.use("/api/master-data/kontak", authMiddleware, requireRole("superadmin", "admin"), kontakRoute);
+app.use("/api/master-data/galeri", authMiddleware, requireRole("superadmin", "admin"), galeriRoutes);
+app.use("/api/master-data/survey", authMiddleware, requireRole("superadmin", "admin"), surveyRoutes);
 
-app.use("/api/master-data/user",authMiddleware, userRoute);
-
-app.use("/api/master-data/dokumen-hukum",authMiddleware, dokumenHukumRoute);
-app.use("/api/master-data/pengajuan-peraturan", authMiddleware, pengajuanPeraturanRoute);
-
-app.use("/api/master-data/pengaturan",authMiddleware, pengaturanRoute);
-
-app.use("/api/master-data/galeri", authMiddleware, galeriRoutes);
-app.use("/api/master-data/survey", authMiddleware, surveyRoutes);
+// Menu Pengguna & Pengaturan: KHUSUS SUPERADMIN (Admin verifikator & pengguna tidak boleh akses)
+app.use("/api/master-data/user", authMiddleware, requireRole("superadmin"), userRoute);
+app.use("/api/master-data/pengaturan", authMiddleware, requireRole("superadmin"), pengaturanRoute);
 
 app.use((req, res) => {
   return res.status(404).json({

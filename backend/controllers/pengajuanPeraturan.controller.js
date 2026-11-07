@@ -1,4 +1,5 @@
 const pengajuanService = require("../services/pengajuanPeraturan.service");
+const { invalidateCache } = require("../config/redis");
 
 const getOptions = async (req, res) => {
     try {
@@ -68,8 +69,8 @@ const create = async (req, res) => {
             catatan_revisi,
         } = req.body;
 
-        const fileDraft = req.files?.file_draft?.[0]?.filename || null;
-        const fileNaskahAkademik = req.files?.file_naskah_akademik?.[0]?.filename || null;
+        const fileDraft = req.files?.file_draft?.[0]?.filename || req.files?.file_dokumen?.[0]?.filename || null;
+        const fileNaskahAkademik = req.files?.file_naskah_akademik?.[0]?.filename || req.files?.file_abstrak?.[0]?.filename || null;
 
         const result = await pengajuanService.create({
             judul,
@@ -85,6 +86,9 @@ const create = async (req, res) => {
             file_draft: fileDraft,
             file_naskah_akademik: fileNaskahAkademik,
         });
+
+        // Invalidate Redis cache setelah create
+        await invalidateCache("pengajuan:*");
 
         return res.status(201).json({
             success: true,

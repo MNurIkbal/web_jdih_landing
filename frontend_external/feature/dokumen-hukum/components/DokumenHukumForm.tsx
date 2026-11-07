@@ -880,7 +880,7 @@ export default function DokumenHukumForm({
           <FormSelect2
             name="status"
             control={control}
-            label="Status"
+            label="Status Dokumen"
             required
             placeholder="Pilih status..."
             options={statusOptions}

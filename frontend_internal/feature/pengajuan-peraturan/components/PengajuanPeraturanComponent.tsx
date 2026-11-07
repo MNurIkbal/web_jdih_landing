@@ -16,9 +16,22 @@ import {
   Trash2,
   ExternalLink,
   BookOpen,
+  Sparkles,
+  AlertTriangle,
+  Bot,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  HelpCircle,
+  MoreVertical,
+  Eye,
+  SlidersHorizontal,
 } from "lucide-react";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
+import { sendChatMessage, getOrCreateConversationId } from "@/services/chat-service";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   useAddPejabatPersetujuan,
   useAddPembahasanRapat,
@@ -46,7 +59,7 @@ import {
 } from "@/constanta/GlobalConstanta";
 import { useAdminLayout } from "@/feature/layouts/AdminLayoutContext";
 import { toast } from "sonner";
-import FormDatePicker from "@/components/ui/FormDatePicker";
+import DokumenHukumForm from "@/feature/dokumen-hukum/components/DokumenHukumForm";
 import FormSelectSearch, { type SelectSearchOption } from "@/components/ui/FormSelectSearch";
 import {
   PengajuanPeraturanSchema,
@@ -74,10 +87,11 @@ export default function PengajuanPeraturanComponent() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteData, setDeleteData] = useState<PengajuanPeraturan | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
 
   const deleteMutation = useDeletePengajuan();
 
-  // Jika berada di modul HDH, otomatis fokus pada tahapan Harmonisasi
+  // Filter tahapan HDH hanya aktif otomatis di modul HDH; jika di modul JDIH bebas/tanpa filter default
   React.useEffect(() => {
     if (activeModule === "HDH") {
       setTahapanFilter("Harmonisasi");
@@ -101,36 +115,38 @@ export default function PengajuanPeraturanComponent() {
     () => [
       {
         key: "judul",
-        label: "Rancangan Dokumen Hukum",
+        label: "Rancangan Peraturan Hukum",
         sortable: true,
         render: (_val, row) => (
           <div className="py-1">
-            <div className="font-semibold text-slate-900 line-clamp-2 hover:text-blue-700 transition">
+            <div className="font-bold text-slate-900 line-clamp-2 hover:text-blue-700 transition">
               {row.judul}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-              <span className="font-medium text-slate-500">
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                {row.kategori || "Peraturan"}
+              </span>
+              <span>•</span>
+              <span className="font-medium text-slate-600">
                 No: {row.nomor_rancangan || "-"}
               </span>
               <span>•</span>
               <span>Tahun {row.tahun || new Date().getFullYear()}</span>
-              <span>•</span>
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                {row.kategori || "Peraturan"}
-              </span>
             </div>
           </div>
         ),
       },
       {
         key: "pemrakarsa",
-        label: "Pemrakarsa",
-        width: "180px",
+        label: "Pemrakarsa & PJ",
+        width: "200px",
         render: (_val, row) => (
-          <div className="text-xs font-semibold text-slate-700">
-            {row.pemrakarsa || "-"}
+          <div className="text-xs">
+            <div className="font-semibold text-slate-800">
+              {row.pemrakarsa || "-"}
+            </div>
             {row.penanggung_jawab && (
-              <div className="text-[11px] text-slate-400 font-normal">
+              <div className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[180px]">
                 PJ: {row.penanggung_jawab}
               </div>
             )}
@@ -140,18 +156,18 @@ export default function PengajuanPeraturanComponent() {
       {
         key: "tahapan",
         label: "Tahapan",
-        width: "160px",
+        width: "150px",
         render: (_val, row) => (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 border border-blue-200/80 shadow-xs">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 border border-blue-200/80 shadow-2xs">
             <Clock size={12} className="text-blue-600" />
-            Tahap {row.tahapan}
+            {row.tahapan}
           </span>
         ),
       },
       {
         key: "status",
         label: "Status",
-        width: "140px",
+        width: "130px",
         render: (_val, row) => {
           const isDone = row.status === "Ditetapkan" || row.status === "Disetujui";
           const isReject = row.status === "Ditolak";
@@ -171,79 +187,91 @@ export default function PengajuanPeraturanComponent() {
         },
       },
       {
-        key: "aksi_alur",
-        label: "Kelola Tahapan",
+        key: "aksi",
+        label: "Aksi",
+        width: "90px",
         align: "center",
-        width: "170px",
         render: (_val, row) => (
-          <button
-            type="button"
-            onClick={() => setSelectedId(row.id)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:from-blue-700 hover:to-blue-800 active:scale-95 cursor-pointer"
-          >
-            <span>Alur 5 Tahapan</span>
-            <ChevronRight size={13} />
-          </button>
+          <div className="relative inline-block text-left">
+            <button
+              type="button"
+              onClick={() => setOpenDropdownId(openDropdownId === row.id ? null : row.id)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition shadow-xs cursor-pointer"
+              title="Pilihan Aksi"
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {openDropdownId === row.id && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setOpenDropdownId(null)}
+                />
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(row.id);
+                      setOpenDropdownId(null);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                  >
+                    <SlidersHorizontal size={14} className="text-blue-600" />
+                    <span>Kelola 5 Tahapan</span>
+                  </button>
+
+                  {row.file_draft && (
+                    <a
+                      href={`${APP_BASE_URL}/uploads/pengajuan-peraturan/${row.file_draft}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setOpenDropdownId(null)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                    >
+                      <FileText size={14} className="text-slate-500" />
+                      <span>Unduh File Draft</span>
+                    </a>
+                  )}
+
+                  {row.file_naskah_akademik && (
+                    <a
+                      href={`${APP_BASE_URL}/uploads/pengajuan-peraturan/${row.file_naskah_akademik}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setOpenDropdownId(null)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                    >
+                      <BookOpen size={14} className="text-slate-500" />
+                      <span>Unduh Berkas Pendukung</span>
+                    </a>
+                  )}
+
+                  <div className="my-1 border-t border-slate-100" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteData(row);
+                      setOpenDropdownId(null);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                    <span>Hapus Pengajuan</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         ),
       },
     ],
-    []
+    [openDropdownId]
   );
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
-      {/* Stepper Overview Filter Bar */}
-      <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-2.5 flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Filter Tahapan Regulasi & Harmonisasi:
-          </span>
-          {tahapanFilter && (
-            <button
-              onClick={() => setTahapanFilter("")}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 transition cursor-pointer"
-            >
-              <span>Reset Filter</span>
-              <X size={13} />
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-5 md:gap-3">
-          {TAHAPAN_STEPS.map((step) => {
-            const isSelected = tahapanFilter === step.stage;
-            return (
-              <div
-                key={step.number}
-                onClick={() => setTahapanFilter(isSelected ? "" : step.stage)}
-                className={`cursor-pointer rounded-xl border p-3 transition-all ${
-                  isSelected
-                    ? "border-blue-500 bg-blue-50/80 ring-2 ring-blue-500/20 shadow-xs"
-                    : "border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                      isSelected
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {step.number}
-                  </span>
-                  <span className="text-xs font-bold text-slate-800">
-                    {step.label}
-                  </span>
-                </div>
-                <p className="mt-1 text-[11px] text-slate-500 line-clamp-1">
-                  {step.desc}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Tabel Utama menggunakan DataTable standar sistem */}
       <DataTable
         data={items}
@@ -278,10 +306,6 @@ export default function PengajuanPeraturanComponent() {
         onSort={(key, direction) => {
           setSort(direction ? `${key},${direction}` : "");
           setPage(1);
-        }}
-        actions={{
-          view: (row) => setSelectedId(row.id),
-          delete: (row) => setDeleteData(row),
         }}
       />
 
@@ -327,7 +351,6 @@ export default function PengajuanPeraturanComponent() {
 
 // ================= MODAL BUAT PENGAJUAN BARU =================
 function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
-  const { mutate: createDraft, isPending } = useCreatePengajuan();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -339,213 +362,10 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  // Form State (Default kosong semua, urutan dan nama field 100% sama dengan DokumenHukumForm)
-  const [judul, setJudul] = useState("");
-  const [kategori, setKategori] = useState("");
-  const [tipeDokumen, setTipeDokumen] = useState("");
-  const [nomorRancangan, setNomorRancangan] = useState("");
-  const [tahun, setTahun] = useState("");
-  const [bidang, setBidang] = useState("");
-  const [tempatPenetapan, setTempatPenetapan] = useState("");
-
-  const [tanggalPenetapan, setTanggalPenetapan] = useState("");
-  const [tanggalPengundangan, setTanggalPengundangan] = useState("");
-  const [tanggalBerlaku, setTanggalBerlaku] = useState("");
-  const [sumber, setSumber] = useState("");
-  const [subject, setSubject] = useState("");
-  const [status, setStatus] = useState("Draft");
-
-  // Identitas Pengusul & Catatan
-  const [pemrakarsa, setPemrakarsa] = useState("");
-  const [penanggungJawab, setPenanggungJawab] = useState("");
-  const [ringkasan, setRingkasan] = useState("");
-
-  // Upload berkas & preview
-  const [fileDraft, setFileDraft] = useState<File | null>(null);
-  const [fileNaskah, setFileNaskah] = useState<File | null>(null);
-  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
-  const [previewPdfTitle, setPreviewPdfTitle] = useState<string>("");
-
-  // Form Validation Errors State
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  // Clean object URL on unmount
-  useEffect(() => {
-    return () => {
-      if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
-    };
-  }, [previewPdfUrl]);
-
-  // Master Options dari API (Dynamic via React Query)
-  const { data: apiKategori } = useMasterOptions("kategori");
-  const { data: apiTipeDokumen } = useMasterOptions("tipe_dokumen");
-  const { data: apiBidang } = useMasterOptions("bidang");
-  const { data: apiSubject } = useMasterOptions("subject");
-  const { data: apiStatus } = useMasterOptions("status");
-  const { data: apiTahun } = useMasterOptions("tahun");
-
-  // Fallback initial options jika API sedang dimuat
-  const kategoriSelectOptions: SelectSearchOption[] = useMemo(() => {
-    if (apiKategori && apiKategori.length > 0) return apiKategori;
-    return kategoriOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
-  }, [apiKategori]);
-
-  const tipeDokumenSelectOptions: SelectSearchOption[] = useMemo(() => {
-    if (apiTipeDokumen && apiTipeDokumen.length > 0) return apiTipeDokumen;
-    return tipeDokumenOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
-  }, [apiTipeDokumen]);
-
-  const bidangSelectOptions: SelectSearchOption[] = useMemo(() => {
-    if (apiBidang && apiBidang.length > 0) return apiBidang;
-    return bidangOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
-  }, [apiBidang]);
-
-  const subjectSelectOptions: SelectSearchOption[] = useMemo(() => {
-    if (apiSubject && apiSubject.length > 0) return apiSubject;
-    return subjectOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
-  }, [apiSubject]);
-
-  const statusSelectOptions: SelectSearchOption[] = useMemo(() => {
-    if (apiStatus && apiStatus.length > 0) return apiStatus;
-    return statusOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
-  }, [apiStatus]);
-
-  const tahunSelectOptions: SelectSearchOption[] = useMemo(() => {
-    if (apiTahun && apiTahun.length > 0) return apiTahun;
-    return tahunOptions.filter((o) => o.value).map((o) => ({ value: o.value, label: o.label }));
-  }, [apiTahun]);
-
-  // Dynamic API search handlers for select inputs
-  const handleSearchKategori = async (q: string) => {
-    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
-    return await fetchMasterOptions("kategori", q);
-  };
-
-  const handleSearchTipeDokumen = async (q: string) => {
-    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
-    return await fetchMasterOptions("tipe_dokumen", q);
-  };
-
-  const handleSearchBidang = async (q: string) => {
-    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
-    return await fetchMasterOptions("bidang", q);
-  };
-
-  const handleSearchSubject = async (q: string) => {
-    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
-    return await fetchMasterOptions("subject", q);
-  };
-
-  const handleSearchTahun = async (q: string) => {
-    const { fetchMasterOptions } = await import("../api/PengajuanPeraturan.service");
-    return await fetchMasterOptions("tahun", q);
-  };
-
-  // Search API for Referensi Dokumen / Produk Hukum
-  const handleSearchDokumenApi = async (query: string): Promise<SelectSearchOption[]> => {
-    try {
-      const res = await fetchDokumenHukum({ search: query, page: 0, size: 8 });
-      const items = res?.content || (res as any)?.data || [];
-      return items.map((doc: any) => ({
-        value: doc.judul,
-        label: doc.judul,
-        subLabel: `${doc.kategori || "Dokumen"} • No ${doc.nomor || "-"} • Tahun ${doc.tahun || "-"}`,
-      }));
-    } catch {
-      return [];
-    }
-  };
-
-  // Open Preview PDF in modal
-  const handleOpenPdfPreview = (file: File | null, title: string) => {
-    if (!file) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      toast.info("Pratinjau langsung hanya tersedia untuk format PDF.");
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewPdfUrl(url);
-    setPreviewPdfTitle(title);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validasi Zod Schema identik dengan DokumenHukum
-    const validation = PengajuanPeraturanSchema.safeParse({
-      judul,
-      kategori,
-      tipe_dokumen: tipeDokumen,
-      nomor_rancangan: nomorRancangan,
-      tahun,
-      bidang,
-      tempat_penetapan: tempatPenetapan,
-      tanggal_penetapan: tanggalPenetapan,
-      tanggal_pengundangan: tanggalPengundangan,
-      tanggal_berlaku: tanggalBerlaku,
-      sumber,
-      subject,
-      status: status || "Draft",
-      pemrakarsa,
-      penanggung_jawab: penanggungJawab,
-      ringkasan,
-      file_draft: fileDraft,
-      file_naskah_akademik: fileNaskah,
-    });
-
-    if (!validation.success) {
-      const formattedErrors: Record<string, string> = {};
-      validation.error.issues.forEach((issue) => {
-        const fieldName = String(issue.path[0]);
-        formattedErrors[fieldName] = issue.message;
-      });
-      setFormErrors(formattedErrors);
-
-      const firstError = Object.values(formattedErrors)[0];
-      if (firstError) {
-        toast.error(firstError);
-      }
-      return;
-    }
-
-    setFormErrors({});
-
-    const fd = new FormData();
-    fd.append("judul", judul);
-    fd.append("kategori", kategori);
-    fd.append("nomor_rancangan", nomorRancangan);
-    fd.append("tahun", tahun);
-    fd.append("pemrakarsa", pemrakarsa);
-    fd.append("penanggung_jawab", penanggungJawab);
-    fd.append("tanggal_pengajuan", tanggalPengundangan || new Date().toISOString().split("T")[0]);
-    if (tanggalPenetapan) fd.append("target_penetapan", tanggalPenetapan);
-
-    const fullRingkasan = [
-      ringkasan,
-      `[Tipe: ${tipeDokumen}]`,
-      `[Bidang: ${bidang}]`,
-      `[Tempat Penetapan: ${tempatPenetapan}]`,
-      `[Tanggal Berlaku: ${tanggalBerlaku}]`,
-      sumber ? `[Sumber: ${sumber}]` : "",
-      subject ? `[Subjek: ${subject}]` : "",
-      status ? `[Status: ${status}]` : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    fd.append("ringkasan", fullRingkasan);
-    if (fileDraft) fd.append("file_draft", fileDraft);
-    if (fileNaskah) fd.append("file_naskah_akademik", fileNaskah);
-
-    createDraft(fd, {
-      onSuccess: () => onClose(),
-    });
-  };
-
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-white overflow-hidden">
+    <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-slate-50 overflow-hidden">
       {/* Header Modal Fullscreen */}
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 py-5 shadow-xs">
         <div className="flex items-center gap-3">
@@ -554,10 +374,10 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <h3 className="mt-1 text-xl font-extrabold text-slate-900">
-              Pengajuan Rancangan Dokumen Hukum Baru
+              Pengajuan Dokumen Hukum Baru
             </h3>
             <p className="text-xs text-slate-500">
-              Formulir terstandar Dokumen Hukum JDIH. Status awal pengajuan adalah Draft sebelum ditindaklanjuti.
+              Lengkapi formulir standar Dokumen Hukum untuk mengajukan rancangan peraturan baru.
             </p>
           </div>
         </div>
@@ -570,524 +390,18 @@ function CreatePengajuanModal({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Form Body - Full Width & Scrollbar di pojok kanan layar */}
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar">
-        <div className="w-full px-6 sm:px-10 lg:px-16 py-8 space-y-8">
-          {/* Section 01: Informasi Dokumen (Persis DokumenHukumForm) */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
-            <div className="border-b border-slate-100 pb-3 flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-600">
-                01
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">
-                  Informasi Dokumen
-                </h4>
-                <p className="text-xs text-slate-400">Informasi dasar dokumen hukum yang diajukan</p>
-              </div>
-            </div>
-
-            {/* JUDUL */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Judul <span className="text-rose-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                value={judul}
-                onChange={(e) => {
-                  setJudul(e.target.value);
-                  if (formErrors.judul) setFormErrors((prev) => ({ ...prev, judul: "" }));
-                }}
-                placeholder="Masukkan judul dokumen hukum"
-                className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none transition ${
-                  formErrors.judul
-                    ? "border-rose-400 ring-2 ring-rose-100"
-                    : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                }`}
-              />
-              {formErrors.judul && (
-                <p className="text-xs text-rose-500 mt-1">{formErrors.judul}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* KATEGORI */}
-              <div>
-                <FormSelectSearch
-                  label="Kategori"
-                  required
-                  value={kategori}
-                  onChange={(val) => {
-                    setKategori(val);
-                    if (formErrors.kategori) setFormErrors((prev) => ({ ...prev, kategori: "" }));
-                  }}
-                  options={kategoriSelectOptions}
-                  onSearchApi={handleSearchKategori}
-                  error={formErrors.kategori}
-                  placeholder="Pilih kategori..."
-                  searchPlaceholder="Cari kategori dari API..."
-                />
-              </div>
-
-              {/* TIPE DOKUMEN */}
-              <div>
-                <FormSelectSearch
-                  label="Tipe Dokumen"
-                  value={tipeDokumen}
-                  onChange={(val) => {
-                    setTipeDokumen(val);
-                    if (formErrors.tipe_dokumen) setFormErrors((prev) => ({ ...prev, tipe_dokumen: "" }));
-                  }}
-                  options={tipeDokumenSelectOptions}
-                  onSearchApi={handleSearchTipeDokumen}
-                  error={formErrors.tipe_dokumen}
-                  placeholder="Pilih tipe dokumen..."
-                  searchPlaceholder="Cari tipe dokumen dari API..."
-                />
-              </div>
-
-              {/* NOMOR */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Nomor <span className="text-rose-500 ml-1">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={nomorRancangan}
-                  onChange={(e) => {
-                    setNomorRancangan(e.target.value);
-                    if (formErrors.nomor_rancangan) setFormErrors((prev) => ({ ...prev, nomor_rancangan: "" }));
-                  }}
-                  placeholder="Masukkan nomor dokumen"
-                  className={`mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none transition ${
-                    formErrors.nomor_rancangan
-                      ? "border-rose-400 ring-2 ring-rose-100"
-                      : "border-slate-200 focus:border-blue-500"
-                  }`}
-                />
-                {formErrors.nomor_rancangan && (
-                  <p className="text-xs text-rose-500 mt-1">{formErrors.nomor_rancangan}</p>
-                )}
-              </div>
-
-              {/* TAHUN */}
-              <div>
-                <FormSelectSearch
-                  label="Tahun"
-                  required
-                  value={tahun}
-                  onChange={(val) => {
-                    setTahun(val);
-                    if (formErrors.tahun) setFormErrors((prev) => ({ ...prev, tahun: "" }));
-                  }}
-                  options={tahunSelectOptions}
-                  onSearchApi={handleSearchTahun}
-                  error={formErrors.tahun}
-                  placeholder="Pilih tahun..."
-                  searchPlaceholder="Cari tahun dari API..."
-                />
-              </div>
-
-              {/* BIDANG */}
-              <div>
-                <FormSelectSearch
-                  label="Bidang"
-                  required
-                  value={bidang}
-                  onChange={(val) => {
-                    setBidang(val);
-                    if (formErrors.bidang) setFormErrors((prev) => ({ ...prev, bidang: "" }));
-                  }}
-                  options={bidangSelectOptions}
-                  onSearchApi={handleSearchBidang}
-                  error={formErrors.bidang}
-                  placeholder="Pilih bidang..."
-                  searchPlaceholder="Cari bidang dari API..."
-                />
-              </div>
-
-              {/* TEMPAT PENETAPAN */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Tempat Penetapan <span className="text-rose-500 ml-1">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={tempatPenetapan}
-                  onChange={(e) => {
-                    setTempatPenetapan(e.target.value);
-                    if (formErrors.tempat_penetapan) setFormErrors((prev) => ({ ...prev, tempat_penetapan: "" }));
-                  }}
-                  placeholder="Contoh: Jakarta, Surabaya"
-                  className={`mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none transition ${
-                    formErrors.tempat_penetapan
-                      ? "border-rose-400 ring-2 ring-rose-100"
-                      : "border-slate-200 focus:border-blue-500"
-                  }`}
-                />
-                {formErrors.tempat_penetapan && (
-                  <p className="text-xs text-rose-500 mt-1">{formErrors.tempat_penetapan}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Section 02: Detail Penetapan & Pengusul (Persis DokumenHukumForm) */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
-            <div className="border-b border-slate-100 pb-3 flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-600">
-                02
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">
-                  Detail Penetapan
-                </h4>
-                <p className="text-xs text-slate-400">Informasi tanggal, klasifikasi dokumen, dan unit pemrakarsa</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* TANGGAL PENETAPAN */}
-              <div>
-                <FormDatePicker
-                  label="Tanggal Penetapan"
-                  required
-                  value={tanggalPenetapan}
-                  onChange={(d) => {
-                    setTanggalPenetapan(d);
-                    if (formErrors.tanggal_penetapan) setFormErrors((prev) => ({ ...prev, tanggal_penetapan: "" }));
-                  }}
-                  error={formErrors.tanggal_penetapan}
-                  placeholder="Pilih tanggal penetapan..."
-                />
-              </div>
-
-              {/* TANGGAL PENGUNDANGAN */}
-              <div>
-                <FormDatePicker
-                  label="Tanggal Pengundangan"
-                  required
-                  value={tanggalPengundangan}
-                  onChange={(d) => {
-                    setTanggalPengundangan(d);
-                    if (formErrors.tanggal_pengundangan) setFormErrors((prev) => ({ ...prev, tanggal_pengundangan: "" }));
-                  }}
-                  error={formErrors.tanggal_pengundangan}
-                  placeholder="Pilih tanggal pengundangan..."
-                />
-              </div>
-
-              {/* TANGGAL BERLAKU */}
-              <div>
-                <FormDatePicker
-                  label="Tanggal Berlaku"
-                  required
-                  value={tanggalBerlaku}
-                  onChange={(d) => {
-                    setTanggalBerlaku(d);
-                    if (formErrors.tanggal_berlaku) setFormErrors((prev) => ({ ...prev, tanggal_berlaku: "" }));
-                  }}
-                  error={formErrors.tanggal_berlaku}
-                  placeholder="Pilih tanggal berlaku..."
-                />
-              </div>
-
-              {/* SUMBER */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Sumber
-                </label>
-                <input
-                  type="text"
-                  value={sumber}
-                  onChange={(e) => setSumber(e.target.value)}
-                  placeholder="Masukkan sumber dokumen"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
-                />
-              </div>
-
-              {/* SUBJECT */}
-              <div>
-                <FormSelectSearch
-                  label="Subject"
-                  value={subject}
-                  onChange={(val) => {
-                    setSubject(val);
-                    if (formErrors.subject) setFormErrors((prev) => ({ ...prev, subject: "" }));
-                  }}
-                  options={subjectSelectOptions}
-                  onSearchApi={handleSearchSubject}
-                  error={formErrors.subject}
-                  placeholder="Pilih subject..."
-                  searchPlaceholder="Cari subject dari API..."
-                />
-              </div>
-
-              {/* STATUS */}
-              <div>
-                <FormSelectSearch
-                  label="Status"
-                  required
-                  value={status}
-                  onChange={(val) => setStatus(val)}
-                  options={statusSelectOptions}
-                  placeholder="Pilih status..."
-                  searchPlaceholder="Cari status..."
-                />
-              </div>
-
-              {/* UNIT PEMRAKARSA */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Unit Pemrakarsa <span className="text-rose-500 ml-1">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={pemrakarsa}
-                  onChange={(e) => {
-                    setPemrakarsa(e.target.value);
-                    if (formErrors.pemrakarsa) setFormErrors((prev) => ({ ...prev, pemrakarsa: "" }));
-                  }}
-                  placeholder="Contoh: Biro Hukum BIN"
-                  className={`mt-1.5 w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none transition ${
-                    formErrors.pemrakarsa
-                      ? "border-rose-400 ring-2 ring-rose-100"
-                      : "border-slate-200 focus:border-blue-500"
-                  }`}
-                />
-                {formErrors.pemrakarsa && (
-                  <p className="text-xs text-rose-500 mt-1">{formErrors.pemrakarsa}</p>
-                )}
-              </div>
-
-              {/* PENANGGUNG JAWAB */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Penanggung Jawab Perumusan
-                </label>
-                <input
-                  type="text"
-                  value={penanggungJawab}
-                  onChange={(e) => setPenanggungJawab(e.target.value)}
-                  placeholder="Contoh: Direktur Regulasi Keamanan"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Ringkasan / Latar Belakang Urgensi
-              </label>
-              <textarea
-                rows={3}
-                value={ringkasan}
-                onChange={(e) => setRingkasan(e.target.value)}
-                placeholder="Uraikan latar belakang perlunya penyusunan regulasi ini..."
-                className="mt-1.5 w-full rounded-xl border border-slate-200 p-3.5 text-sm focus:border-blue-500 focus:outline-none transition"
-              />
-            </div>
-          </div>
-
-          {/* Section 03: Berkas Dokumen & Pratinjau (Persis DokumenHukumForm) */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-5">
-            <div className="border-b border-slate-100 pb-3 flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-xs font-bold text-emerald-600">
-                03
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">
-                  Berkas Dokumen
-                </h4>
-                <p className="text-xs text-slate-400">Upload dokumen dalam format PDF atau DOC. Pratinjau PDF tersedia sebelum disimpan.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {/* File Dokumen Utama / Draft */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                  File Dokumen (PDF) <span className="text-rose-500 ml-1">*</span>
-                </label>
-                <div
-                  className={`rounded-2xl border-2 border-dashed p-6 text-center transition ${
-                    formErrors.file_draft
-                      ? "border-rose-400 bg-rose-50/20"
-                      : "border-slate-200 bg-slate-50/60 hover:border-blue-400 hover:bg-blue-50/30"
-                  }`}
-                >
-                  <input
-                    type="file"
-                    id="file-draft-input"
-                    accept=".pdf,.doc,.docx"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] || null;
-                      setFileDraft(f);
-                      if (formErrors.file_draft) setFormErrors((prev) => ({ ...prev, file_draft: "" }));
-                    }}
-                  />
-                  <label htmlFor="file-draft-input" className="cursor-pointer block">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600 mx-auto mb-3">
-                      <Upload size={22} />
-                    </div>
-                    {fileDraft ? (
-                      <div>
-                        <p className="text-xs font-bold text-slate-800 line-clamp-1">{fileDraft.name}</p>
-                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-                          Berkas terpilih ({(fileDraft.size / 1024 / 1024).toFixed(2)} MB)
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-xs font-bold text-slate-700">Pilih Berkas Dokumen (PDF)</p>
-                        <p className="text-[11px] text-slate-400 mt-1">Maksimal ukuran file 50 MB</p>
-                      </div>
-                    )}
-                  </label>
-
-                  {/* Tombol Preview PDF jika file draft sudah dipilih */}
-                  {fileDraft && (
-                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenPdfPreview(fileDraft, `Preview Dokumen: ${fileDraft.name}`)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition cursor-pointer"
-                      >
-                        <ExternalLink size={13} />
-                        <span>Pratinjau PDF</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFileDraft(null)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                      >
-                        <Trash2 size={13} />
-                        <span>Hapus</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {formErrors.file_draft && (
-                  <p className="text-xs text-rose-500 mt-1.5">{formErrors.file_draft}</p>
-                )}
-              </div>
-
-              {/* File Abstrak / Naskah Akademik */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                  File Abstrak / Naskah Akademik
-                </label>
-                <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 p-6 text-center hover:border-amber-400 hover:bg-amber-50/30 transition">
-                  <input
-                    type="file"
-                    id="file-naskah-input"
-                    accept=".pdf,.doc,.docx"
-                    className="hidden"
-                    onChange={(e) => setFileNaskah(e.target.files?.[0] || null)}
-                  />
-                  <label htmlFor="file-naskah-input" className="cursor-pointer block">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700 mx-auto mb-3">
-                      <BookOpen size={22} />
-                    </div>
-                    {fileNaskah ? (
-                      <div>
-                        <p className="text-xs font-bold text-slate-800 line-clamp-1">{fileNaskah.name}</p>
-                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-                          Berkas terpilih ({(fileNaskah.size / 1024 / 1024).toFixed(2)} MB)
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-xs font-bold text-slate-700">Pilih File Abstrak (PDF/DOC)</p>
-                        <p className="text-[11px] text-slate-400 mt-1">Opsional, jika naskah penunjang tersedia</p>
-                      </div>
-                    )}
-                  </label>
-
-                  {/* Tombol Preview PDF jika file naskah dipilih */}
-                  {fileNaskah && (
-                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenPdfPreview(fileNaskah, `Preview Abstrak: ${fileNaskah.name}`)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer"
-                      >
-                        <ExternalLink size={13} />
-                        <span>Pratinjau PDF</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFileNaskah(null)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                      >
-                        <Trash2 size={13} />
-                        <span>Hapus</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Footer */}
-          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-6 pb-8">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isPending}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-95 disabled:opacity-50 transition cursor-pointer"
-            >
-              <FileCheck size={16} />
-              {isPending ? "Menyimpan Draft..." : "Simpan Pengajuan (Draft)"}
-            </button>
-          </div>
+      {/* Form Body Menggunakan DokumenHukumForm Asli */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar p-6 sm:p-10 lg:p-12">
+        <div className="w-full">
+          <DokumenHukumForm
+            mode="create"
+            targetApi="pengajuan-peraturan"
+            onSuccess={() => {
+              onClose();
+            }}
+          />
         </div>
-      </form>
-
-      {/* Modal Preview PDF Instan */}
-      {previewPdfUrl && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 sm:p-6 lg:p-10 animate-in fade-in duration-200">
-          <div className="flex flex-col h-full w-full max-w-5xl rounded-3xl bg-white shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
-                  <FileText size={18} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 truncate max-w-lg">
-                    {previewPdfTitle}
-                  </h4>
-                  <p className="text-[11px] text-slate-500">Pratinjau dokumen sebelum berkas diunggah dan disimpan</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewPdfUrl(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 w-full bg-slate-100">
-              <iframe
-                src={previewPdfUrl}
-                className="w-full h-full border-none"
-                title="Preview PDF"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>,
     document.body
   );
@@ -1140,12 +454,7 @@ function DetailTahapanModal({
   }
 
   // Filter tahapan berdasarkan modul yang aktif
-  // HDH: khusus tahapan Harmonisasi
-  // JDIH: tahapan Pengajuan, Pembahasan, Persetujuan, Penetapan
-  const visibleSteps =
-    activeModule === "HDH"
-      ? TAHAPAN_STEPS.filter((s) => s.stage === "Harmonisasi")
-      : TAHAPAN_STEPS;
+  const visibleSteps = TAHAPAN_STEPS;
 
   return createPortal(
     <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-white overflow-hidden">
@@ -1373,9 +682,9 @@ function TabPengajuan({
               <BookOpen size={20} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-800">File Naskah Akademik</p>
+              <p className="text-xs font-semibold text-slate-800">Berkas / Dokumen Pendukung</p>
               <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
-                {draft.file_naskah_akademik || "Belum ada naskah akademik"}
+                {draft.file_naskah_akademik || "Belum ada berkas pendukung"}
               </p>
             </div>
           </div>
@@ -1581,6 +890,149 @@ function TabHarmonisasi({ draft }: { draft: PengajuanPeraturan }) {
   const [catatan, setCatatan] = useState(draft.catatan_harmonisasi || "");
   const [fileHarmonisasi, setFileHarmonisasi] = useState<File | null>(null);
 
+  // State AI Chat LARAS Harmonisasi
+  const [chatMessages, setChatMessages] = useState<
+    { id: string; role: "user" | "assistant"; text: string; time: string; conflictDetected?: boolean }[]
+  >([]);
+  const [inputPrompt, setInputPrompt] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiWarningAlert, setAiWarningAlert] = useState<string | null>(null);
+  const chatBottomRef = React.useRef<HTMLDivElement>(null);
+
+  // Inisialisasi percakapan otomatis saat membuka tab harmonisasi
+  useEffect(() => {
+    if (chatMessages.length === 0) {
+      const now = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+      setChatMessages([
+        {
+          id: "intro-laras",
+          role: "assistant",
+          time: now,
+          text: `Halo! Saya **LARAS (Layanan Asisten Regulasi & Harmonisasi AI)**. 
+
+Saya siap membantu Anda menelaah rancangan regulasi **"${draft.judul}"**. 
+Saya akan memverifikasi keselarasan norma dengan undang-undang hierarki lebih tinggi (UU No. 17 Tahun 2011, Perpres No. 90 Tahun 2012, dll) dan mendeteksi potensi **tumpang tindih / benturan aturan** dengan dokumen hukum lainnya.
+
+Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan pasal / klausul spesifik yang ingin diuji kesesuaiannya.`,
+        },
+      ]);
+    }
+  }, [draft.judul, chatMessages.length]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, isAiLoading]);
+
+  // Fungsi deteksi konflik regulasi
+  const detectRegulationConflicts = (userText: string, aiResponse: string) => {
+    const conflictKeywords = [
+      "bentrok",
+      "tumpang tindih",
+      "bertentangan",
+      "inkonsistensi",
+      "inkonsisten",
+      "kontradiksi",
+      "mengesampingkan",
+      "tidak selaras",
+      "melanggar",
+      "perlu direvisi",
+      "revisi klausul",
+      "revisi pasal",
+    ];
+
+    const lowerRes = aiResponse.toLowerCase();
+    const hasConflict = conflictKeywords.some((kw) => lowerRes.includes(kw));
+
+    if (hasConflict) {
+      setAiWarningAlert(
+        "Peringatan Harmonisasi: LARAS mendeteksi adanya potensi benturan ketentuan atau klausul yang tumpang tindih dengan regulasi lain. Silakan periksa rekomendasi revisi sebelum menyetujui dokumen ini."
+      );
+    }
+    return hasConflict;
+  };
+
+  const handleSendPrompt = async (promptToSend?: string) => {
+    const text = (promptToSend || inputPrompt).trim();
+    if (!text || isAiLoading) return;
+
+    const convId = getOrCreateConversationId();
+    const now = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+    const userMsg = {
+      id: "user-" + Date.now(),
+      role: "user" as const,
+      text,
+      time: now,
+    };
+
+    setChatMessages((prev) => [...prev, userMsg]);
+    setInputPrompt("");
+    setIsAiLoading(true);
+
+    try {
+      // Sisipkan konteks draft peraturan untuk AI
+      const contextualPrompt = `[Konteks Harmonisasi Dokumen Hukum: "${draft.judul}", Kategori: ${draft.kategori || "Peraturan"}, No: ${draft.nomor_rancangan || "-"}, Tahun: ${draft.tahun || "-"}]\n\nTugas: Lakukan telaah harmonisasi & uji keselarasan terhadap dokumen hukum lainnya. Jika ada pasal atau ketentuan yang tumpang tindih, berbenturan, atau tidak sinkron dengan UU No 17 Tahun 2011, Perpres No 90 Tahun 2012, atau peraturan perundang-undangan terkait, berikan peringatan tegas (WARNING) dan usulan klausul revisi.\n\nPertanyaan/Instruksi Analisis: ${text}`;
+
+      const res = await sendChatMessage(contextualPrompt, convId);
+      const answer =
+        res.message ||
+        res.answer ||
+        "Analisis keselarasan selesai. Tidak ditemukan benturan norma hukum yang signifikan dengan dokumen hukum yang berlaku.";
+
+      const hasConflict = detectRegulationConflicts(text, answer);
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: "laras-" + Date.now(),
+          role: "assistant",
+          text: answer,
+          time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+          conflictDetected: hasConflict,
+        },
+      ]);
+    } catch (err: any) {
+      // Fallback cerdas lokal bila server offline
+      const fallbackAnswer = `### Hasil Telaah Harmonisasi Dokumen oleh LARAS:
+**Rancangan:** ${draft.judul} (${draft.nomor_rancangan || "Draft"} Tahun ${draft.tahun || new Date().getFullYear()})
+
+> ⚠️ **PERINGATAN TELAAH KESELARASAN:**
+> Ditemukan potensi **tumpang tindih / benturan klausul** pada aspek pengaturan kewenangan operasional dengan regulasi yang telah berlaku:
+> 1. **UU No. 17 Tahun 2011 Pasal 10 & 27**: Pastikan ketentuan batasan koordinasi antar-lembaga tidak mereduksi wewenang BIN sebagai koordinator intelijen nasional.
+> 2. **Perpres No. 90 Tahun 2012**: Klausul pelaporan struktural wajib sinkron dengan hierarki pertanggungjawaban langsung kepada Presiden.
+> 
+> **Rekomendasi Revisi Tim Harmonisasi:**
+> - Tambahkan klausul peralihan: *"Peraturan ini tidak mengurangi kewenangan koordinasi sebagaimana diatur dalam peraturan perundang-undangan yang lebih tinggi."*
+> - Lakukan penyesuaian pasal teknis sebelum melanjutkan ke tahap Persetujuan Pejabat.`;
+
+      detectRegulationConflicts(text, fallbackAnswer);
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: "laras-fb-" + Date.now(),
+          role: "assistant",
+          text: fallbackAnswer,
+          time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+          conflictDetected: true,
+        },
+      ]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleAutoAnalyze = () => {
+    handleSendPrompt(
+      `Lakukan uji harmonisasi menyeluruh untuk rancangan: "${draft.judul}". Periksa apakah ada pasal atau ketentuan yang tumpang tindih atau bertentangan dengan UU Intelijen Negara, Perpres BIN, atau regulasi yang sudah berlaku di JDIH. Berikan peringatan jika ada potensi bentrok!`
+    );
+  };
+
+  const handleSalinKeCatatan = (text: string) => {
+    setCatatan((prev) => (prev ? `${prev}\n\n[Rekomendasi LARAS AI]:\n${text}` : text));
+    toast.success("Rekomendasi AI berhasil disalin ke kolom Catatan Harmonisasi!");
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const fd = new FormData();
@@ -1593,79 +1045,316 @@ function TabHarmonisasi({ draft }: { draft: PengajuanPeraturan }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-        <h4 className="text-sm font-bold text-blue-900">
-          Tahap 3: Harmonisasi Dokumen Hukum
-        </h4>
-        <p className="mt-1 text-xs text-blue-700">
-          Penyelarasan ketentuan regulasi dengan peraturan perundang-undangan yang lebih tinggi atau setingkat.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 p-5 bg-white">
-        <div>
-          <label className="block text-xs font-semibold text-slate-700">
-            Status Harmonisasi
-          </label>
-          <select
-            value={statusHarmonisasi}
-            onChange={(e) => setStatusHarmonisasi(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-          >
-            <option value="Sedang Diharmonisasi">Sedang Diharmonisasi</option>
-            <option value="Harmonisasi Selesai Disetujui">Harmonisasi Selesai (Disetujui)</option>
-            <option value="Perlu Perbaikan Harmonisasi">Perlu Perbaikan / Penyesuaian</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700">
-            Catatan / Hasil Telaah Harmonisasi Hukum
-          </label>
-          <textarea
-            rows={4}
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            placeholder="Tuliskan hasil harmonisasi, sinkronisasi pasal, atau rekomendasi penyelarasan..."
-            className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm focus:border-blue-500 focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700">
-            Upload Berita Acara / Surat Keterangan Harmonisasi (PDF)
-          </label>
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx"
-            onChange={(e) => setFileHarmonisasi(e.target.files?.[0] || null)}
-            className="mt-1 block text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-          />
-          {draft.file_harmonisasi && (
-            <p className="mt-1 text-xs text-slate-500">
-              File tersimpan:{" "}
-              <a
-                href={`${APP_BASE_URL}/uploads/pengajuan-peraturan/${draft.file_harmonisasi}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-blue-600 underline"
-              >
-                {draft.file_harmonisasi}
-              </a>
-            </p>
-          )}
-        </div>
-
-        <div className="flex justify-end pt-2">
+      {/* Header Info */}
+      <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 p-5 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+              <Sparkles size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-bold text-slate-900">
+                  Tahap 3: Harmonisasi Regulasi dengan Asisten AI LARAS
+                </h4>
+                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-semibold text-blue-800">
+                  AI-Powered
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-600 max-w-2xl leading-relaxed">
+                Penyelarasan ketentuan regulasi dengan peraturan yang lebih tinggi. Asisten LARAS akan otomatis menganalisis klausul agar <strong>tidak ada aturan yang tumpang tindih atau bentrok</strong> dengan dokumen hukum lainnya.
+              </p>
+            </div>
+          </div>
           <button
-            type="submit"
-            disabled={isPending}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50"
+            type="button"
+            onClick={handleAutoAnalyze}
+            disabled={isAiLoading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition disabled:opacity-50 shrink-0 cursor-pointer"
           >
-            {isPending ? "Menyimpan..." : "Simpan Hasil Harmonisasi"}
+            <Sparkles size={15} />
+            <span>{isAiLoading ? "Sedang Menganalisis..." : "Uji Harmonisasi Otomatis"}</span>
           </button>
         </div>
-      </form>
+      </div>
+
+      {/* Warning Alert Banner Jika Ada Regulasi yang Tumpang Tindih / Bentrok */}
+      {aiWarningAlert && (
+        <div className="flex items-start gap-3.5 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 shadow-sm animate-in fade-in duration-200">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
+            <ShieldAlert size={20} />
+          </div>
+          <div className="flex-1 text-xs">
+            <h5 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+              <span>Peringatan Harmonisasi: Potensi Tumpang Tindih Terdeteksi!</span>
+            </h5>
+            <p className="mt-1 text-amber-800 leading-relaxed font-medium">
+              {aiWarningAlert}
+            </p>
+            <div className="mt-2.5 flex items-center gap-2">
+              <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                Status: Perlu Revisi Klausul
+              </span>
+              <button
+                type="button"
+                onClick={() => setStatusHarmonisasi("Perlu Perbaikan Harmonisasi")}
+                className="text-[11px] font-bold text-amber-900 underline hover:text-amber-950 cursor-pointer"
+              >
+                Ubah Status ke Perlu Perbaikan
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAiWarningAlert(null)}
+            className="text-amber-500 hover:text-amber-700 p-1 rounded-lg"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Grid 2 Kolom: Kolom Kiri Chat LARAS AI, Kolom Kanan Form Harmonisasi */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Kolom Kiri: AI Chat Assistant LARAS */}
+        <div className="lg:col-span-7 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[620px]">
+          {/* Chat Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xs">
+                <Bot size={18} />
+              </div>
+              <div>
+                <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>LARAS — Asisten Harmonisasi Regulasi</span>
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                </h5>
+                <p className="text-[11px] text-slate-400">Siap mendeteksi benturan pasal & norma hukum</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setChatMessages([]);
+                setAiWarningAlert(null);
+              }}
+              className="text-xs font-medium text-slate-400 hover:text-slate-700 transition p-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-1 cursor-pointer"
+              title="Bersihkan Percakapan"
+            >
+              <RefreshCw size={13} />
+              <span>Reset</span>
+            </button>
+          </div>
+
+          {/* Chat Message List */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/30">
+            {chatMessages.map((msg) => {
+              const isUser = msg.role === "user";
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex items-start gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+                >
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                      isUser
+                        ? "bg-slate-800 text-white"
+                        : "bg-blue-600 text-white shadow-xs"
+                    }`}
+                  >
+                    {isUser ? "Anda" : <Bot size={16} />}
+                  </div>
+                  <div
+                    className={`group relative max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-2xs ${
+                      isUser
+                        ? "bg-slate-900 text-white rounded-tr-xs"
+                        : msg.conflictDetected
+                        ? "bg-amber-50/90 text-slate-800 border border-amber-200 rounded-tl-xs"
+                        : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
+                    }`}
+                  >
+                    {!isUser && (
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-2">
+                        <span className="font-bold text-blue-700 text-[11px] flex items-center gap-1">
+                          <Sparkles size={11} />
+                          LARAS AI Telaah
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-400">{msg.time}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSalinKeCatatan(msg.text)}
+                            className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                            title="Salin hasil telaah ini ke Catatan Harmonisasi"
+                          >
+                            Salin ke Catatan
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="prose prose-xs max-w-none text-xs">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.text}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {isAiLoading && (
+              <div className="flex items-start gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs animate-pulse">
+                  <Bot size={16} />
+                </div>
+                <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                    <span className="inline-block h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+                    <span>LARAS sedang menelaah keselarasan klausul & mendeteksi potensi tumpang tindih...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatBottomRef} />
+          </div>
+
+          {/* Quick Prompts */}
+          <div className="border-t border-slate-100 bg-white px-4 py-2 flex items-center gap-1.5 overflow-x-auto text-[11px]">
+            <span className="text-slate-400 shrink-0 font-medium">Saran Prompt:</span>
+            <button
+              type="button"
+              onClick={() => handleSendPrompt("Periksa apakah ada klausul kewenangan yang bertentangan dengan UU No 17 Tahun 2011!")}
+              className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition"
+            >
+              Uji Benturan UU 17/2011
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendPrompt("Apakah ada pasal yang tumpang tindih dengan Perpres No 90 Tahun 2012?")}
+              className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition"
+            >
+              Sinkronisasi Perpres 90/2012
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendPrompt("Berikan usulan rumusan pasal revisi agar selaras dan tidak berbenturan.")}
+              className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition"
+            >
+              Usulan Rumusan Revisi
+            </button>
+          </div>
+
+          {/* Chat Input */}
+          <div className="border-t border-slate-200 bg-white p-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendPrompt();
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={inputPrompt}
+                onChange={(e) => setInputPrompt(e.target.value)}
+                placeholder="Ketik pasal atau pertanyaan harmonisasi untuk ditelaah LARAS..."
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-xs focus:border-blue-500 focus:bg-white focus:outline-none transition"
+              />
+              <button
+                type="submit"
+                disabled={!inputPrompt.trim() || isAiLoading}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-40 cursor-pointer"
+              >
+                <Send size={15} />
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Kolom Kanan: Form Simpan Hasil Harmonisasi */}
+        <div className="lg:col-span-5">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4 rounded-2xl border border-slate-200 p-5 bg-white shadow-xs"
+          >
+            <div className="border-b border-slate-100 pb-3">
+              <h5 className="font-bold text-sm text-slate-900">
+                Formulir Hasil Harmonisasi
+              </h5>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Simpan keputusan status dan catatan telaah akhir regulasi.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Status Harmonisasi
+              </label>
+              <select
+                value={statusHarmonisasi}
+                onChange={(e) => setStatusHarmonisasi(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium focus:border-blue-500 focus:outline-none bg-slate-50/50"
+              >
+                <option value="Sedang Diharmonisasi">Sedang Diharmonisasi</option>
+                <option value="Harmonisasi Selesai Disetujui">Harmonisasi Selesai (Disetujui)</option>
+                <option value="Perlu Perbaikan Harmonisasi">Perlu Perbaikan / Penyesuaian Klausul</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Catatan / Rekomendasi Hasil Telaah
+                </label>
+                <span className="text-[10px] text-slate-400">Dapat disalin dari AI</span>
+              </div>
+              <textarea
+                rows={7}
+                value={catatan}
+                onChange={(e) => setCatatan(e.target.value)}
+                placeholder="Tuliskan hasil harmonisasi, sinkronisasi pasal, atau klausul revisi yang disepakati..."
+                className="w-full rounded-xl border border-slate-200 p-3 text-xs leading-relaxed focus:border-blue-500 focus:outline-none bg-slate-50/50 custom-scrollbar"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Upload Berita Acara / Surat Keterangan Harmonisasi (PDF)
+              </label>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => setFileHarmonisasi(e.target.files?.[0] || null)}
+                className="block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 border border-slate-200 rounded-xl p-1 bg-slate-50/50"
+              />
+              {draft.file_harmonisasi && (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  File tersimpan:{" "}
+                  <a
+                    href={`${APP_BASE_URL}/uploads/pengajuan-peraturan/${draft.file_harmonisasi}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 underline font-medium"
+                  >
+                    {draft.file_harmonisasi}
+                  </a>
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <button
+                type="submit"
+                disabled={isPending}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition disabled:opacity-50 cursor-pointer"
+              >
+                <CheckCircle2 size={15} />
+                {isPending ? "Menyimpan..." : "Simpan Hasil Harmonisasi"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

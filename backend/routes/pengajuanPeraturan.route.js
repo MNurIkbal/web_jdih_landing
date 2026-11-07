@@ -12,7 +12,9 @@ router.post(
     "/",
     upload.fields([
         { name: "file_draft", maxCount: 1 },
+        { name: "file_dokumen", maxCount: 1 },
         { name: "file_naskah_akademik", maxCount: 1 },
+        { name: "file_abstrak", maxCount: 1 },
     ]),
     pengajuanController.create
 );

@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const dokumenHukumService =
     require("../services/dokumenHukum.service");
 const { applyWatermark } = require("../utils/pdfWatermark");
+const { invalidateCache } = require("../config/redis");
 
 const getAll = async (req, res) => {
     try {
@@ -239,6 +240,8 @@ const create = async (req, res) => {
             tanggal_berlaku: tanggal_berlaku.trim(),
             status: status.trim(),
         });
+
+        await invalidateCache("dokumen-hukum:*");
 
         return res.status(201).json({
             success: true,

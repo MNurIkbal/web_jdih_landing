@@ -264,12 +264,12 @@ export function PenilaianSummarySection() {
                           <Layers className="h-3.5 w-3.5 text-primary" />
                           Kemudahan Navigasi &amp; Tampilan Visual
                         </span>
-                        <span className="font-mono font-bold text-primary">{persentaseKepuasan}%</span>
+                        <span className="font-mono font-bold text-primary">{persentaseKepuasanWeb}%</span>
                       </div>
                       <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500"
-                          style={{ width: `${persentaseKepuasan}%` }}
+                          style={{ width: `${persentaseKepuasanWeb}%` }}
                         />
                       </div>
                     </div>
@@ -277,16 +277,10 @@ export function PenilaianSummarySection() {
                 )}
               </div>
             </div>
-
           </div>
-
-          {/* ================= KOLOM KANAN: SUMMARY PENILAIAN DOKUMEN HUKUM ================= */}
           <div className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-50/50 p-8 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:border-amber-400 hover:shadow-2xl hover:shadow-amber-500/10 sm:p-10">
-            {/* Top gradient neon bar */}
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600" />
-
             <div>
-              {/* Header Card */}
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200 shadow-sm">
@@ -301,11 +295,10 @@ export function PenilaianSummarySection() {
                     </h3>
                   </div>
                 </div>
-
                 <div className="flex flex-col items-end gap-1">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 shadow-sm">
                     <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-                    Grade A (Sangat Baik)
+                    {predikatTextDokumen}
                   </span>
                   <span className="text-[10px] text-slate-500 font-mono">
                     Standar Kemenkumham
@@ -350,46 +343,71 @@ export function PenilaianSummarySection() {
                 </div>
               </div>
 
-              {/* Progress Detail Indikator */}
+              {/* Progress Detail Indikator (Dinamis dari Survey Dokumen) */}
               <div className="mt-7 space-y-4">
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
-                      Keabsahan Naskah &amp; Ketepatan Peraturan
-                    </span>
-                    <span className="font-mono font-bold text-amber-700">98.5%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[98.5%] rounded-full bg-gradient-to-r from-amber-500 to-yellow-400" />
-                  </div>
-                </div>
+                {indikatorDokumen.length > 0 ? (
+                  indikatorDokumen.map((item) => {
+                    const IconComp = item.icon;
+                    return (
+                      <div key={item.id}>
+                        <div className="flex items-center justify-between text-xs font-medium">
+                          <span className="flex items-center gap-2 text-slate-700 truncate max-w-[80%]">
+                            <IconComp className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                            <span className="truncate" title={item.judul}>{item.judul}</span>
+                          </span>
+                          <span className="font-mono font-bold text-amber-700 shrink-0">{item.persentase}%</span>
+                        </div>
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-700"
+                            style={{ width: `${Math.min(Math.max(item.persentase, 5), 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-2 text-slate-700">
+                          <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
+                          Keabsahan Naskah &amp; Ketepatan Peraturan
+                        </span>
+                        <span className="font-mono font-bold text-amber-700">98.5%</span>
+                      </div>
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full w-[98.5%] rounded-full bg-gradient-to-r from-amber-500 to-yellow-400" />
+                      </div>
+                    </div>
 
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <FileCheck2 className="h-3.5 w-3.5 text-amber-600" />
-                      Kelengkapan Abstrak &amp; Metadata Resmi
-                    </span>
-                    <span className="font-mono font-bold text-amber-700">97.2%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[97.2%] rounded-full bg-gradient-to-r from-amber-500 to-yellow-400" />
-                  </div>
-                </div>
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-2 text-slate-700">
+                          <FileCheck2 className="h-3.5 w-3.5 text-amber-600" />
+                          Kelengkapan Abstrak &amp; Metadata Resmi
+                        </span>
+                        <span className="font-mono font-bold text-amber-700">97.2%</span>
+                      </div>
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full w-[97.2%] rounded-full bg-gradient-to-r from-amber-500 to-yellow-400" />
+                      </div>
+                    </div>
 
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <DownloadCloud className="h-3.5 w-3.5 text-amber-600" />
-                      Aksesibilitas Unduhan File Asli PDF
-                    </span>
-                    <span className="font-mono font-bold text-amber-700">99.1%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[99.1%] rounded-full bg-gradient-to-r from-amber-500 to-yellow-400" />
-                  </div>
-                </div>
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-2 text-slate-700">
+                          <DownloadCloud className="h-3.5 w-3.5 text-amber-600" />
+                          Aksesibilitas Unduhan File Asli PDF
+                        </span>
+                        <span className="font-mono font-bold text-amber-700">99.1%</span>
+                      </div>
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full w-[99.1%] rounded-full bg-gradient-to-r from-amber-500 to-yellow-400" />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

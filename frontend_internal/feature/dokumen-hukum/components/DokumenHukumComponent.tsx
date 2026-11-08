@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useState, useMemo } from "react";
+import { Suspense, useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   usePathname,
   useRouter,
@@ -315,111 +316,106 @@ function DokumenHukumContent() {
     );
   };
 
+  const formatTanggalIndo = (val?: string | null) => {
+    if (!val) return "-";
+    if (typeof val === "string") {
+      const match = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (match) {
+        const localDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        return new Intl.DateTimeFormat("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(localDate);
+      }
+    }
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  };
+
   const columns: DataTableColumn<DokumenHukum>[] = useMemo(
     () => [
       {
-        key: "judul",
-        label: "Dokumen Hukum Terpublikasi",
-        sortable: true,
-        width: "360px",
+        key: "tanggal_penetapan",
+        label: "Tanggal & Nomor",
+        width: "180px",
         render: (_val, row) => (
-          <div className="py-1 max-w-[360px]">
-            <div className="font-bold text-slate-900 line-clamp-2 hover:text-blue-700 transition">
+          <div className="py-1">
+            <div className="text-xs font-semibold text-slate-800">
+              {formatTanggalIndo(row.tanggal_penetapan || row.tanggal_pengundangan || row.tanggal_berlaku)}
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              Nomor: <span className="font-medium text-slate-700">{row.nomor || "-"}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "judul",
+        label: "Judul Dokumen",
+        sortable: true,
+        width: "320px",
+        render: (_val, row) => (
+          <div className="py-1 max-w-[320px]">
+            <div className="font-semibold text-slate-900 line-clamp-2 hover:text-blue-700 transition">
               {row.judul}
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-                {row.kategori || "Peraturan"}
-              </span>
-              <span>•</span>
-              <span className="font-medium text-slate-600">
-                Nomor: {row.nomor || "-"}
-              </span>
-              <span>•</span>
-              <span>Tahun {row.tahun || "-"}</span>
-              {row.bidang && (
-                <>
-                  <span>•</span>
-                  <span className="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                    {row.bidang}
-                  </span>
-                </>
-              )}
-            </div>
           </div>
         ),
       },
       {
-        key: "tipe_dokumen",
-        label: "Tipe & Penetapan",
-        width: "220px",
-        render: (_val, row) => (
-          <div className="text-xs">
-            <div className="font-semibold text-slate-700">
-              {row.tipe_dokumen || "-"}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
-              {row.tempat_penetapan ? `${row.tempat_penetapan}, ` : ""}
-              {row.tanggal_penetapan ? String(row.tanggal_penetapan).split("T")[0] : ""}
-            </div>
-          </div>
-        ),
-      },
-      {
-        key: "file_dokumen",
-        label: "Berkas",
+        key: "kategori",
+        label: "Kategori",
         width: "140px",
-        align: "center",
-        render: (_val, row) => {
-          if (!row.file_dokumen) {
-            return <span className="text-xs text-slate-400">Tidak ada file</span>;
-          }
-          return (
-            <a
-              href={`${APP_BASE_URL}/uploads/dokumen-hukum/${row.file_dokumen}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
-            >
-              <FileText size={13} />
-              <span>Lihat PDF</span>
-              <ExternalLink size={11} />
-            </a>
-          );
-        },
+        render: (_val, row) => (
+          <div className="text-xs font-medium text-slate-700">
+            {row.kategori || "-"}
+          </div>
+        ),
+      },
+      {
+        key: "bidang",
+        label: "Bidang",
+        width: "160px",
+        render: (_val, row) => (
+          <div className="text-xs font-medium text-slate-700">
+            {row.bidang || "-"}
+          </div>
+        ),
       },
       {
         key: "status",
-        label: "Status Publikasi",
-        width: "160px",
-        align: "center",
+        label: "Status",
+        width: "150px",
         render: (value) => {
           const isBerlaku =
             value === "Berlaku" ||
             value === true ||
-            value === 1;
+            value === 1 ||
+            String(value).toLowerCase().includes("selesai") ||
+            String(value).toLowerCase().includes("publikasi");
+
+          const statusText = isBerlaku ? "Berlaku" : String(value || "Draft");
 
           return (
             <span
-              className={`
-                inline-flex
-                items-center
-                gap-1.5
-                rounded-full
-                px-3
-                py-1
-                text-xs
-                font-bold
-                border
-                ${
-                  isBerlaku
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-slate-100 text-slate-600 border-slate-200"
-                }
-              `}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold border shadow-2xs ${
+                isBerlaku
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-slate-100 text-slate-700 border-slate-200"
+              }`}
             >
-              <CheckCircle2 size={13} className={isBerlaku ? "text-emerald-600" : "text-slate-400"} />
-              {isBerlaku ? "Selesai Publikasi" : String(value || "Draft")}
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  isBerlaku ? "bg-emerald-500" : "bg-slate-400"
+                }`}
+              />
+              <span>{statusText}</span>
             </span>
           );
         },
@@ -427,7 +423,7 @@ function DokumenHukumContent() {
       {
         key: "aksi",
         label: "Aksi",
-        width: "100px",
+        width: "90px",
         align: "center",
         render: (_val, row) => {
           return (
@@ -447,30 +443,18 @@ function DokumenHukumContent() {
                     className="fixed inset-0 z-40"
                     onClick={() => setOpenDropdownId(null)}
                   />
-                  <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
                     <button
                       type="button"
                       onClick={() => {
                         setDetailModalData(row);
                         setOpenDropdownId(null);
                       }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                     >
-                      <Eye size={14} className="text-blue-600" />
+                      <Eye size={14} className="text-slate-500" />
                       <span>Detail Dokumen</span>
                     </button>
-                    {row.file_dokumen && (
-                      <a
-                        href={`${APP_BASE_URL}/uploads/dokumen-hukum/${row.file_dokumen}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={() => setOpenDropdownId(null)}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
-                      >
-                        <FileText size={14} className="text-slate-500" />
-                        <span>Unduh PDF</span>
-                      </a>
-                    )}
                   </div>
                 </>
               )}
@@ -481,12 +465,6 @@ function DokumenHukumContent() {
     ],
     [openDropdownId]
   );
-
-  /**
-   * ============================================================
-   * RENDER
-   * ============================================================
-   */
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-5 py-8 sm:px-7 lg:px-8 lg:py-10">
@@ -609,200 +587,315 @@ function DokumenHukumContent() {
       </div>
 
       {/* ======================================================
-          MODAL DETAIL DOKUMEN HUKUM
+          MODAL DETAIL DOKUMEN HUKUM (DISAMAKAN DENGAN PENGAJUAN PERATURAN)
       ====================================================== */}
-      {detailModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setDetailModalData(null)}
-          />
-
-          {/* Modal Container */}
-          <div className="relative z-10 w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-5">
-              <div className="space-y-1 pr-6">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700">
-                    <FileText size={13} />
-                    {detailModalData.kategori || "Peraturan"}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    <CheckCircle2 size={13} />
-                    {detailModalData.status || "Publikasi (Berlaku)"}
-                  </span>
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 leading-snug pt-1">
-                  {detailModalData.judul}
+      {detailModalData && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-slate-50 overflow-hidden">
+          {/* Header Modal Fullscreen */}
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 py-5 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                <Eye size={24} />
+              </div>
+              <div>
+                <h3 className="mt-1 text-xl font-extrabold text-slate-900">
+                  Detail Dokumen Hukum
                 </h3>
+                <p className="text-xs text-slate-500">
+                  Rincian lengkap dokumen hukum: {detailModalData.judul}
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setDetailModalData(null)}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
-                aria-label="Tutup Detail"
-              >
-                <X size={20} />
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setDetailModalData(null)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
-              {/* Section 1: Data Identitas Peraturan */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <Info size={14} className="text-blue-600" />
-                  Identitas Dokumen
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 rounded-xl bg-slate-50/80 p-4 border border-slate-100">
-                  <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Nomor</span>
-                    <span className="text-sm font-bold text-slate-800">{detailModalData.nomor || "-"}</span>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar p-6 sm:p-10 lg:p-12">
+            <div className="w-full space-y-8">
+              {/* Card 01: Informasi Dokumen */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-xs">
+                <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white shadow-xs">
+                    01
                   </div>
                   <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tahun</span>
-                    <span className="text-sm font-bold text-slate-800">{detailModalData.tahun || "-"}</span>
+                    <h3 className="font-extrabold text-slate-900 text-base">Informasi Dokumen</h3>
+                    <p className="text-xs text-slate-400">Informasi dasar dokumen hukum</p>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Judul Dokumen
+                    </span>
+                    <p className="text-sm font-extrabold text-slate-900 leading-relaxed">
+                      {detailModalData.judul}
+                    </p>
+                  </div>
+
                   <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tipe Dokumen</span>
-                    <span className="text-sm font-semibold text-slate-800">{detailModalData.tipe_dokumen || "-"}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Kategori
+                    </span>
+                    <span className="inline-block px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
+                      {detailModalData.kategori || "-"}
+                    </span>
                   </div>
+
                   <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Bidang Hukum</span>
-                    <span className="text-sm font-semibold text-slate-800">{detailModalData.bidang || "-"}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Tipe Dokumen
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.tipe_dokumen || "-"}
+                    </p>
                   </div>
-                  <div className="sm:col-span-2">
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Subjek Dokumen</span>
-                    <span className="text-sm font-semibold text-slate-800">{detailModalData.subject || "-"}</span>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Nomor Rancangan
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.nomor_rancangan || detailModalData.nomor || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Tahun
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.tahun || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Bidang Hukum
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.bidang || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Tempat Penetapan
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.tempat_penetapan || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Unit Kerja / Eselon Pemrakarsa
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.pemrakarsa || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Penanggung Jawab Substansi (PIC)
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.penanggung_jawab || "-"}
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Dasar Kewenangan Pembentukan Peraturan
+                    </span>
+                    <p className="text-xs font-medium text-slate-700 leading-relaxed bg-slate-50/70 p-3.5 rounded-xl border border-slate-100">
+                      {detailModalData.dasar_hukum || "-"}
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Urgensi & Latar Belakang Perumusan Regulasi
+                    </span>
+                    <div className="text-xs font-medium text-slate-700 whitespace-pre-line leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-100">
+                      {detailModalData.urgensi || detailModalData.ringkasan || "-"}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Section 2: Penetapan & Pengundangan */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <Calendar size={14} className="text-blue-600" />
-                  Penetapan & Pengundangan
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 rounded-xl bg-slate-50/80 p-4 border border-slate-100">
-                  <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tempat Penetapan</span>
-                    <span className="text-sm font-medium text-slate-800">{detailModalData.tempat_penetapan || "-"}</span>
+              {/* Card 02: Detail Penetapan */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-xs">
+                <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-xs">
+                    02
                   </div>
                   <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tgl Penetapan</span>
-                    <span className="text-sm font-medium text-slate-800">
-                      {detailModalData.tanggal_penetapan ? String(detailModalData.tanggal_penetapan).split("T")[0] : "-"}
+                    <h3 className="font-extrabold text-slate-900 text-base">Detail Penetapan</h3>
+                    <p className="text-xs text-slate-400">Informasi tanggal dan status dokumen</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Tanggal Penetapan
                     </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {formatTanggalIndo(detailModalData.tanggal_penetapan)}
+                    </p>
                   </div>
+
                   <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tgl Pengundangan</span>
-                    <span className="text-sm font-medium text-slate-800">
-                      {detailModalData.tanggal_pengundangan ? String(detailModalData.tanggal_pengundangan).split("T")[0] : "-"}
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Tanggal Pengundangan
                     </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {formatTanggalIndo(detailModalData.tanggal_pengundangan)}
+                    </p>
                   </div>
+
                   <div>
-                    <span className="text-[11px] font-medium text-slate-400 block uppercase">Tgl Berlaku</span>
-                    <span className="text-sm font-medium text-slate-800">
-                      {detailModalData.tanggal_berlaku ? String(detailModalData.tanggal_berlaku).split("T")[0] : "-"}
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Tanggal Berlaku
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {formatTanggalIndo(detailModalData.tanggal_berlaku)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Sumber
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.sumber || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Subject
+                    </span>
+                    <p className="text-xs font-semibold text-slate-800">
+                      {detailModalData.subject || detailModalData.subjek || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Status Dokumen
+                    </span>
+                    <span className="inline-block px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                      {detailModalData.status || "Berlaku"}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Section 3: Sumber */}
-              {detailModalData.sumber && (
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
-                    <BookOpen size={14} className="text-blue-600" />
-                    Sumber Dokumen
-                  </h4>
-                  <div className="rounded-xl bg-slate-50/80 p-3.5 border border-slate-100 text-sm text-slate-700">
-                    {detailModalData.sumber}
+              {/* Card 03: Berkas Dokumen */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-sm font-bold text-emerald-600">
+                    03
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Berkas Dokumen</h3>
+                    <p className="text-xs text-slate-400">Dokumen berkas utama dan abstrak</p>
                   </div>
                 </div>
-              )}
 
-              {/* Section 4: Berkas Dokumen PDF */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                  <FileCheck size={14} className="text-blue-600" />
-                  Berkas Terkait
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* File Dokumen Utama */}
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition shadow-2xs">
-                    <div className="flex items-center gap-3 min-w-0 pr-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
                         <FileText size={20} />
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-800 truncate">
-                          File Dokumen Utama
-                        </div>
-                        <div className="text-xs text-slate-400 truncate">
-                          {detailModalData.file_dokumen || "Tidak ada berkas"}
-                        </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">File Dokumen Utama</p>
+                        <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                          {detailModalData.file_dokumen || "Belum ada file dokumen"}
+                        </p>
                       </div>
                     </div>
                     {detailModalData.file_dokumen && (
-                      <a
-                        href={`${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_dokumen}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition"
-                      >
-                        <ExternalLink size={13} />
-                        <span>Buka</span>
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = `${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_dokumen}`;
+                            window.open(url, "_blank");
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          <Eye size={12} />
+                          Preview
+                        </button>
+                        <a
+                          href={`${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_dokumen}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
+                        >
+                          <Download size={12} />
+                          Download
+                        </a>
+                      </div>
                     )}
                   </div>
 
-                  {/* File Abstrak */}
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition shadow-2xs">
-                    <div className="flex items-center gap-3 min-w-0 pr-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                        <FileCheck size={20} />
+                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                        <BookOpen size={20} />
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-800 truncate">
-                          File Abstrak
-                        </div>
-                        <div className="text-xs text-slate-400 truncate">
-                          {detailModalData.file_abstrak || "Tidak ada berkas abstrak"}
-                        </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">File Berkas Abstrak</p>
+                        <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                          {detailModalData.file_abstrak || "Belum ada berkas abstrak"}
+                        </p>
                       </div>
                     </div>
                     {detailModalData.file_abstrak && (
-                      <a
-                        href={`${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_abstrak}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
-                      >
-                        <ExternalLink size={13} />
-                        <span>Buka</span>
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = `${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_abstrak}`;
+                            window.open(url, "_blank");
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          <Eye size={12} />
+                          Preview
+                        </button>
+                        <a
+                          href={`${APP_BASE_URL}/uploads/dokumen-hukum/${detailModalData.file_abstrak}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition cursor-pointer shadow-xs"
+                        >
+                          <Download size={12} />
+                          Download
+                        </a>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50 px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setDetailModalData(null)}
-                className="rounded-xl border border-slate-300 bg-white px-5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition shadow-xs cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ======================================================

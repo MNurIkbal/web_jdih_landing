@@ -34,6 +34,7 @@ export interface PembahasanItem {
 export interface PersetujuanItem {
   id: number;
   draft_id: number;
+  user_id?: number | string | null;
   nama_pejabat: string;
   jabatan: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";
@@ -71,6 +72,8 @@ export interface PengajuanPeraturan {
   catatan_harmonisasi?: string;
   file_harmonisasi?: string;
   tanggal_harmonisasi?: string;
+  // Tahap 4 Persetujuan
+  status_penunjukan_pejabat?: "Draft" | "Disimpan" | string;
   // Tahap 5 Penetapan
   nomor_penetapan?: string;
   tanggal_penetapan?: string;

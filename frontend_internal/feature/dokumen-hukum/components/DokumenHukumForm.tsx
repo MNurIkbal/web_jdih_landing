@@ -153,6 +153,8 @@ export default function DokumenHukumForm({
       subject: "",
 
       status: "",
+      dokumen_terkait_id: null,
+      catatan_status_relasi: "",
 
       file_abstrak: null,
       file_dokumen: null,
@@ -182,6 +184,8 @@ export default function DokumenHukumForm({
     subject: "",
 
     status: "",
+    dokumen_terkait_id: null,
+    catatan_status_relasi: "",
 
     file_abstrak: null,
     file_dokumen: null,
@@ -248,6 +252,9 @@ export default function DokumenHukumForm({
 
       status: rawData.status_dokumen ?? (rawData.status === "Berlaku" || rawData.status === "Tidak Berlaku" || rawData.status === "Dicabut" || rawData.status === "Diubah" ? rawData.status : "Berlaku"),
 
+      dokumen_terkait_id: data.dokumen_terkait_id ? String(data.dokumen_terkait_id) : rawData.dokumen_terkait_id ? String(rawData.dokumen_terkait_id) : null,
+      catatan_status_relasi: data.catatan_status_relasi ?? rawData.catatan_status_relasi ?? "",
+
       file_abstrak: data.file_abstrak ?? rawData.file_naskah_akademik ?? null,
 
       file_dokumen: data.file_dokumen ?? rawData.file_draft ?? null,
@@ -299,6 +306,18 @@ export default function DokumenHukumForm({
     formData.append("subject", values.subject ?? "");
 
     formData.append("status", values.status);
+
+    if (values.dokumen_terkait_id) {
+      formData.append("dokumen_terkait_id", String(values.dokumen_terkait_id));
+    } else {
+      formData.append("dokumen_terkait_id", "");
+    }
+
+    if (values.catatan_status_relasi) {
+      formData.append("catatan_status_relasi", values.catatan_status_relasi.trim());
+    } else {
+      formData.append("catatan_status_relasi", "");
+    }
 
     if (values.file_abstrak instanceof File) {
       formData.append("file_abstrak", values.file_abstrak);
@@ -1099,6 +1118,11 @@ export default function DokumenHukumForm({
             value={watch("status")}
             onChange={(val) => {
               setValue("status", val, { shouldValidate: true, shouldDirty: true });
+              const s = (val || "").toLowerCase().trim();
+              if (s === "berlaku" || s === "tidak berlaku" || s === "") {
+                setValue("dokumen_terkait_id", null, { shouldValidate: true });
+                setValue("catatan_status_relasi", "");
+              }
             }}
             options={(apiStatus && apiStatus.length > 0 ? apiStatus : statusOptions)
               .filter((o) => o.value && o.value.toLowerCase() !== "draft")
@@ -1109,6 +1133,39 @@ export default function DokumenHukumForm({
             error={errors.status?.message}
             disabled={isSubmitting}
           />
+
+          {/* DOKUMEN HUKUM TERKAIT (MUNCUL JIKA STATUS BUKAN BERLAKU / TIDAK BERLAKU) */}
+          {(() => {
+            const currentStatus = (watch("status") || "").toLowerCase().trim();
+            const isSpecialStatus = currentStatus !== "berlaku" && currentStatus !== "tidak berlaku" && currentStatus !== "";
+            if (!isSpecialStatus) return null;
+
+            return (
+              <div className="md:col-span-2 rounded-xl border border-blue-200 bg-blue-50/40 p-4 transition-all">
+                <div className="mb-2">
+                  <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                    Relasi Dokumen Hukum Terkait ({watch("status")})
+                  </span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Pilih dokumen hukum yang {watch("status").toLowerCase()} oleh peraturan ini untuk ditampilkan pada status relasi peraturan.
+                  </p>
+                </div>
+                <FormSelectSearch
+                  label="Dokumen Hukum"
+                  required
+                  value={watch("dokumen_terkait_id") ? String(watch("dokumen_terkait_id")) : ""}
+                  onChange={(val) => {
+                    setValue("dokumen_terkait_id", val, { shouldValidate: true, shouldDirty: true });
+                  }}
+                  onSearchApi={(q) => fetchMasterOptions("dokumen", q)}
+                  placeholder="Cari dan pilih dokumen hukum yang terkait..."
+                  searchPlaceholder="Ketik judul atau nomor peraturan..."
+                  error={(errors as any).dokumen_terkait_id?.message}
+                  disabled={isSubmitting}
+                />
+              </div>
+            );
+          })()}
         </div>
       </div>
 

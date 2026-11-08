@@ -26,8 +26,8 @@ const update = async (id, data) => {
     return await pengajuanRepo.updateDraft(id, data);
 };
 
-const updateTahap = async (id, tahapan, status, catatan_verifikasi) => {
-    return await pengajuanRepo.updateTahapan(id, tahapan, status, catatan_verifikasi);
+const updateTahap = async (id, tahapan, status, catatan_verifikasi, status_penunjukan_pejabat) => {
+    return await pengajuanRepo.updateTahapan(id, tahapan, status, catatan_verifikasi, status_penunjukan_pejabat);
 };
 
 const addPembahasan = async (draftId, data) => {

@@ -63,6 +63,13 @@ export const DokumenHukumSchema = z.object({
   status: z
     .string()
     .min(1, "Status wajib dipilih"),
+
+  dokumen_terkait_id: z
+    .union([z.string(), z.number(), z.null()])
+    .optional(),
+
+  catatan_status_relasi: z
+    .string().optional(),
   file_abstrak: z
     .union([
       z.instanceof(File),
@@ -183,6 +190,17 @@ export const DokumenHukumSchema = z.object({
       }
     ),
 
+})
+.superRefine((data, ctx) => {
+  const s = (data.status || "").toLowerCase().trim();
+  const isSpecialStatus = s !== "berlaku" && s !== "tidak berlaku" && s !== "";
+  if (isSpecialStatus && (!data.dokumen_terkait_id || String(data.dokumen_terkait_id).trim() === "")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Dokumen hukum terkait wajib dipilih jika status bukan Berlaku / Tidak Berlaku",
+      path: ["dokumen_terkait_id"],
+    });
+  }
 });
 
 export type DokumenHukumFormValues =

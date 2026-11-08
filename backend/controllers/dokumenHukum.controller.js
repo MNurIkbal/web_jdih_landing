@@ -143,6 +143,8 @@ const create = async (req, res) => {
             sumber,
             subject,
             status,
+            dokumen_terkait_id,
+            catatan_status_relasi,
         } = req.body;
 
         const fileAbstrak =
@@ -239,6 +241,8 @@ const create = async (req, res) => {
             tanggal_pengundangan: tanggal_pengundangan.trim(),
             tanggal_berlaku: tanggal_berlaku.trim(),
             status: status.trim(),
+            dokumen_terkait_id: dokumen_terkait_id ? Number(dokumen_terkait_id) : null,
+            catatan_status_relasi: catatan_status_relasi?.trim() || null,
         });
 
         await invalidateCache("dokumen-hukum:*");
@@ -278,6 +282,8 @@ const update = async (req, res) => {
             sumber,
             subject,
             status,
+            dokumen_terkait_id,
+            catatan_status_relasi,
         } = req.body || {};
 
         const file_abstrak =
@@ -306,7 +312,9 @@ const update = async (req, res) => {
                     tanggal_berlaku,
                     sumber,
                     subject,
-                    status
+                    status,
+                    dokumen_terkait_id: dokumen_terkait_id !== undefined && dokumen_terkait_id !== null && dokumen_terkait_id !== "" ? Number(dokumen_terkait_id) : null,
+                    catatan_status_relasi: catatan_status_relasi?.trim() || null,
                 }
             );
 

@@ -100,8 +100,26 @@ const getById = async (id) => {
             ""
         )}/uploads/dokumen-hukum`;
 
+    // Buat statusRelasi jika ada relasi dokumen_terkait_id
+    const statusRelasi = [];
+    if (result.dokumen_terkait_id && result.dokumen_terkait_judul) {
+        statusRelasi.push({
+            aksi: result.status || "Relasi",
+            label: `${result.dokumen_terkait_kategori || "Peraturan"} Nomor ${result.dokumen_terkait_nomor || "-"} Tahun ${result.dokumen_terkait_tahun || "-"} tentang ${result.dokumen_terkait_judul}`,
+            href: `/dokumen-hukum/${result.dokumen_terkait_id}`,
+            id: result.dokumen_terkait_id,
+            status: result.dokumen_terkait_status || "Berlaku",
+            judul: result.dokumen_terkait_judul,
+            nomor: result.dokumen_terkait_nomor,
+            tahun: result.dokumen_terkait_tahun,
+            kategori: result.dokumen_terkait_kategori,
+        });
+    }
+
     return {
         ...result,
+
+        statusRelasi: statusRelasi.length > 0 ? statusRelasi : (result.statusRelasi || []),
 
         file_abstrak:
             result.file_abstrak
@@ -131,6 +149,8 @@ const create = async ({
     sumber = null,
     subject = null,
     status,
+    dokumen_terkait_id = null,
+    catatan_status_relasi = null,
 }) => {
     if (!judul?.trim()) {
         throw new Error("Judul wajib diisi");
@@ -198,6 +218,8 @@ const create = async ({
         sumber: sumber?.trim() || null,
         subject: subject?.trim() || null,
         status,
+        dokumen_terkait_id: dokumen_terkait_id ? Number(dokumen_terkait_id) : null,
+        catatan_status_relasi: catatan_status_relasi?.trim() || null,
     });
 };
 
@@ -219,6 +241,8 @@ const update = async (
         sumber,
         subject,
         status,
+        dokumen_terkait_id,
+        catatan_status_relasi,
     }
 ) => {
     const existing =
@@ -292,6 +316,8 @@ const update = async (
             sumber,
             subject,
             status,
+            dokumen_terkait_id: dokumen_terkait_id !== undefined && dokumen_terkait_id !== null && dokumen_terkait_id !== "" ? Number(dokumen_terkait_id) : null,
+            catatan_status_relasi: catatan_status_relasi || null,
         }
     );
 };

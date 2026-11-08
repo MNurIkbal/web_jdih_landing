@@ -42,7 +42,7 @@ export const updatePengajuan = async (
 
 export const updateTahapanPengajuan = async (
   id: number,
-  payload: { tahapan: string; status?: string }
+  payload: { tahapan: string; status?: string; status_penunjukan_pejabat?: string; catatan_verifikasi?: string }
 ): Promise<PengajuanPeraturan> => {
   const res = await api.put(`/pengajuan-peraturan/${id}/tahapan`, payload);
   return res.data.data;
@@ -85,7 +85,7 @@ export const submitHarmonisasi = async (
 // Tahap 4: Persetujuan
 export const addPejabatPersetujuan = async (
   draftId: number,
-  payload: { nama_pejabat: string; jabatan: string }
+  payload: { user_id?: string | number; nama_pejabat: string; jabatan?: string }
 ) => {
   const res = await api.post(
     `/pengajuan-peraturan/${draftId}/persetujuan`,

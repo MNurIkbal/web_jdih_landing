@@ -79,9 +79,11 @@ export const useUpdateTahapanPengajuan = () => {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: any }) =>
       updateTahapanPengajuan(id, payload),
-    onSuccess: () => {
-      toast.success("Tahapan berhasil diperbarui");
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["PengajuanPeraturan"] });
+      if (variables?.id) {
+        qc.invalidateQueries({ queryKey: ["PengajuanPeraturan", variables.id] });
+      }
     },
     onError: (error: any) => {
       toast.error(getErrorMessage(error));
@@ -126,7 +128,7 @@ export const useSubmitHarmonisasi = () => {
     mutationFn: ({ draftId, formData }: { draftId: number; formData: FormData }) =>
       submitHarmonisasi(draftId, formData),
     onSuccess: () => {
-      toast.success("Harmonisasi dokumen berhasil dicatat");
+      // toast.success("Harmonisasi dokumen berhasil dicatat");
       qc.invalidateQueries({ queryKey: ["PengajuanPeraturan"] });
     },
     onError: (error: any) => {
@@ -141,9 +143,12 @@ export const useAddPejabatPersetujuan = () => {
   return useMutation({
     mutationFn: ({ draftId, payload }: { draftId: number; payload: any }) =>
       addPejabatPersetujuan(draftId, payload),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Pejabat persetujuan berhasil ditambahkan ke checklist");
       qc.invalidateQueries({ queryKey: ["PengajuanPeraturan"] });
+      if (variables?.draftId) {
+        qc.invalidateQueries({ queryKey: ["PengajuanPeraturan", variables.draftId] });
+      }
     },
     onError: (error: any) => {
       toast.error(getErrorMessage(error));

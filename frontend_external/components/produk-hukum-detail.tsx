@@ -72,9 +72,16 @@ export type ProdukHukum = {
   peraturanTerkait?: StatusRelasi[];
   peraturanPelaksanaan?: StatusRelasi[];
   hasilUjiMateri?: StatusRelasi[];
+  dokumen_terkait_id?: number | string | null;
+  dokumen_terkait_judul?: string | null;
+  dokumen_terkait_nomor?: string | null;
+  dokumen_terkait_tahun?: string | number | null;
+  dokumen_terkait_kategori?: string | null;
+  dokumen_terkait_status?: string | null;
+  catatan_status_relasi?: string | null;
 };
 
-type ActiveView = "metadata" | "teks" | "preview-abstrak" | "preview-peraturan";
+type ActiveView = "metadata" | "status-peraturan" | "teks" | "preview-abstrak" | "preview-peraturan";
 
 export function ProdukHukumDetail({ id }: { id: number }) {
   const { data, isLoading, isError, refetch } = useDokumenHukumWebDetail(id);
@@ -193,6 +200,8 @@ export function ProdukHukumDetail({ id }: { id: number }) {
           <div className="min-h-[420px] rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
             {view === "metadata" && <MetadataView produk={produk} />}
 
+            {view === "status-peraturan" && <StatusPeraturanView produk={produk} />}
+
             {view === "teks" && <TeksAbstrakView produk={produk} />}
 
             {view === "preview-abstrak" && (
@@ -220,6 +229,35 @@ export function ProdukHukumDetail({ id }: { id: number }) {
 
               <ChevronRight className="h-4 w-4" />
             </button>
+
+            {/* TAB STATUS PERATURAN (MUNCUL JIKA STATUS BUKAN BERLAKU / TIDAK BERLAKU ATAU MEMILIKI RELASI STATUS) */}
+            {(() => {
+              const currentStatus = (produk.status || "").toLowerCase().trim();
+              const isSpecialStatus =
+                (currentStatus !== "berlaku" && currentStatus !== "tidak berlaku" && currentStatus !== "") ||
+                (produk.statusRelasi && produk.statusRelasi.length > 0) ||
+                !!produk.dokumen_terkait_id;
+
+              if (!isSpecialStatus) return null;
+
+              return (
+                <button
+                  type="button"
+                  onClick={() => setView("status-peraturan")}
+                  className={`group flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all ${view === "status-peraturan"
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border bg-card text-foreground hover:border-primary/30 hover:bg-primary/[0.03]"
+                    }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Scale className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Status Peraturan</span>
+                  </span>
+
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              );
+            })()}
 
             {produk.file_abstrak && (
               <SidebarSection
@@ -604,6 +642,127 @@ function MetadataView({ produk }: { produk: ProdukHukum }) {
           );
         })}
       </dl>
+    </div>
+  );
+}
+
+function StatusPeraturanView({ produk }: { produk: ProdukHukum }) {
+  const statusRelasiList = produk.statusRelasi && produk.statusRelasi.length > 0
+    ? produk.statusRelasi
+    : produk.dokumen_terkait_id
+      ? [
+          {
+            aksi: produk.status || "Relasi",
+            label: `${produk.dokumen_terkait_kategori || "Peraturan"} Nomor ${produk.dokumen_terkait_nomor || "-"} Tahun ${produk.dokumen_terkait_tahun || "-"} tentang ${produk.dokumen_terkait_judul || ""}`,
+            href: `/dokumen-hukum/${produk.dokumen_terkait_id}`,
+            status: produk.dokumen_terkait_status || "Berlaku",
+            judul: produk.dokumen_terkait_judul || "",
+            nomor: produk.dokumen_terkait_nomor || "",
+            tahun: produk.dokumen_terkait_tahun || "",
+            kategori: produk.dokumen_terkait_kategori || "Peraturan",
+          },
+        ]
+      : [];
+
+  return (
+    <div className="space-y-6">
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Scale className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="font-display text-lg font-bold text-foreground">
+              Status Peraturan
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Keterangan relasi hukum dan peraturan terkait.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Status Dokumen Saat Ini:
+          </span>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              produk.status === "Berlaku"
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400"
+                : "bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-400"
+            }`}
+          >
+            {produk.status || "Berlaku"}
+          </span>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-bold text-foreground mb-4">
+          Daftar Relasi Peraturan Hukum Terkait:
+        </h3>
+
+        {statusRelasiList.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground text-sm">
+            Tidak ada data relasi peraturan terkait.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {statusRelasiList.map((rel: any, idx: number) => (
+              <div
+                key={idx}
+                className="relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/40 hover:shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                          {rel.aksi || produk.status}
+                        </span>
+                        {rel.kategori && (
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {rel.kategori}
+                          </span>
+                        )}
+                        {rel.nomor && (
+                          <span className="text-xs text-muted-foreground">
+                            No. {rel.nomor}
+                          </span>
+                        )}
+                        {rel.tahun && (
+                          <span className="text-xs text-muted-foreground">
+                            Thn {rel.tahun}
+                          </span>
+                        )}
+                      </div>
+                      <Link
+                        href={rel.href || `/dokumen-hukum/${rel.id}`}
+                        className="text-sm font-semibold text-foreground hover:text-primary transition-colors line-clamp-2"
+                      >
+                        {rel.label || rel.judul}
+                      </Link>
+                    </div>
+                  </div>
+
+                  <Link
+                    href={rel.href || `/dokumen-hukum/${rel.id}`}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition"
+                  >
+                    <span>Lihat</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

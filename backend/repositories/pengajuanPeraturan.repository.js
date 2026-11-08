@@ -18,7 +18,9 @@ const ensureDraftColumns = async () => {
             ADD COLUMN IF NOT EXISTS sumber TEXT,
             ADD COLUMN IF NOT EXISTS urgensi TEXT,
             ADD COLUMN IF NOT EXISTS dasar_hukum TEXT,
-            ADD COLUMN IF NOT EXISTS catatan_verifikasi TEXT;
+            ADD COLUMN IF NOT EXISTS catatan_verifikasi TEXT,
+            ADD COLUMN IF NOT EXISTS status_penunjukan_pejabat VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS riwayat_penolakan_persetujuan JSONB;
 
             CREATE TABLE IF NOT EXISTS draft_peraturan_pembahasan (
                 id SERIAL PRIMARY KEY,
@@ -283,18 +285,37 @@ const updateDraft = async (id, data) => {
     return res.rows[0];
 };
 
-const updateTahapan = async (id, tahapan, status, catatan_verifikasi = null) => {
+const updateTahapan = async (id, tahapan, status, catatan_verifikasi = null, status_penunjukan_pejabat = undefined) => {
     await ensureDraftColumns();
+
+    // Jika beralih maju dari Harmonisasi ke Tahap Persetujuan (misalnya setelah perbaikan revisi selesai),
+    // reset/bersihkan data checklist persetujuan sebelumnya agar memulai persetujuan baru dari awal yang bersih (status Menunggu, catatan/file lampiran kosong).
+    if (tahapan === "Persetujuan" && status_penunjukan_pejabat === undefined) {
+        await pool.query(
+            `DELETE FROM draft_peraturan_persetujuan WHERE draft_id = $1`,
+            [id]
+        );
+        // Reset status penunjukan pejabat ke 'Draft' dan status harmonisasi menjadi 'Harmonisasi Selesai'
+        status_penunjukan_pejabat = 'Draft';
+    }
+
     const query = `
         UPDATE draft_peraturan
-        SET tahapan = $2,
+        SET tahapan = COALESCE($2, tahapan),
             status = COALESCE($3, status),
             catatan_verifikasi = COALESCE($4, catatan_verifikasi),
+            status_penunjukan_pejabat = COALESCE($5, status_penunjukan_pejabat),
             updated_at = NOW()
         WHERE id = $1
         RETURNING *;
     `;
-    const res = await pool.query(query, [id, tahapan, status, catatan_verifikasi]);
+    const res = await pool.query(query, [
+        id,
+        tahapan || null,
+        status || null,
+        catatan_verifikasi,
+        status_penunjukan_pejabat !== undefined ? status_penunjukan_pejabat : null,
+    ]);
     return res.rows[0];
 };
 
@@ -331,7 +352,14 @@ const removePembahasan = async (id) => {
 
 // Tahap 3: Harmonisasi
 const updateHarmonisasi = async (draftId, data) => {
-    const { status_harmonisasi, catatan_harmonisasi, file_harmonisasi } = data;
+    const {
+        status_harmonisasi,
+        catatan_harmonisasi,
+        file_harmonisasi,
+        chat_history,
+        conflict_findings,
+        warning_alert,
+    } = data;
     const query = `
         UPDATE draft_peraturan
         SET tahapan = 'Harmonisasi',
@@ -339,6 +367,9 @@ const updateHarmonisasi = async (draftId, data) => {
             status_harmonisasi = $2,
             catatan_harmonisasi = $3,
             file_harmonisasi = COALESCE($4, file_harmonisasi),
+            harmonisasi_chat_history = COALESCE($5::jsonb, harmonisasi_chat_history),
+            harmonisasi_conflict_findings = $6::jsonb,
+            harmonisasi_warning_alert = $7,
             tanggal_harmonisasi = NOW(),
             updated_at = NOW()
         WHERE id = $1
@@ -349,6 +380,9 @@ const updateHarmonisasi = async (draftId, data) => {
         status_harmonisasi || "Harmonisasi Selesai",
         catatan_harmonisasi || null,
         file_harmonisasi || null,
+        chat_history ? JSON.stringify(chat_history) : null,
+        conflict_findings !== undefined ? JSON.stringify(conflict_findings) : null,
+        warning_alert !== undefined ? warning_alert : null,
     ]);
     return res.rows[0];
 };
@@ -382,19 +416,33 @@ const updatePersetujuanStatus = async (persetujuanId, data) => {
     const res = await pool.query(query, [persetujuanId, status, catatan || null, file_lampiran || null]);
     const updatedItem = res.rows[0];
 
-    // JIKA STATUS DITOLAK: Kembalikan draft peraturan ke Tahap Harmonisasi!
+    // JIKA STATUS DITOLAK: Kembalikan draft peraturan ke Tahap Harmonisasi
+    // Simpan snapshot data penolakan (pejabat, catatan, file_lampiran) ke kolom riwayat_penolakan_persetujuan
     if (status === "Ditolak" && updatedItem && updatedItem.draft_id) {
+        const snapshotPenolakan = {
+            id: updatedItem.id,
+            nama_pejabat: updatedItem.nama_pejabat || 'Pejabat',
+            jabatan: updatedItem.jabatan || 'Pejabat Penyetuju',
+            status: 'Ditolak',
+            catatan: catatan || null,
+            file_lampiran: updatedItem.file_lampiran || file_lampiran || null,
+            tanggal_persetujuan: new Date().toISOString(),
+        };
+
         await pool.query(
             `UPDATE draft_peraturan 
              SET tahapan = 'Harmonisasi', 
                  status = 'Perlu Perbaikan Harmonisasi',
                  status_harmonisasi = 'Perlu Perbaikan Harmonisasi',
-                 catatan_harmonisasi = CONCAT(COALESCE(catatan_harmonisasi, ''), E'\n\n[Ditolak pada Tahap Persetujuan oleh ', $2, ' (', $3, ')]: ', $4),
+                 status_penunjukan_pejabat = 'Draft',
+                 riwayat_penolakan_persetujuan = $2::jsonb,
+                 catatan_harmonisasi = CONCAT(COALESCE(catatan_harmonisasi, ''), E'\n\n[Ditolak pada Tahap Persetujuan oleh ', $3::text, ' (', $4::text, ')]: ', $5::text),
                  updated_at = NOW() 
              WHERE id = $1`,
             [
                 updatedItem.draft_id,
-                updatedItem.nama_pejabat,
+                JSON.stringify(snapshotPenolakan),
+                updatedItem.nama_pejabat || 'Pejabat',
                 updatedItem.jabatan || 'Pejabat Penyetuju',
                 catatan || 'Dokumen draf peraturan ditolak dan dikembalikan untuk dilakukan harmonisasi ulang.'
             ]
@@ -629,6 +677,29 @@ const getOptions = async ({ type = "", query = "" } = {}) => {
                 ? defaults.status.filter((s) => s.toLowerCase().includes(searchStr))
                 : defaults.status;
             return list.map((s) => ({ value: s, label: s }));
+        }
+        if (t === "dokumen" || t === "dokumen_hukum" || t === "peraturan") {
+            try {
+                let docSql = `
+                    SELECT id, nomor, tahun, judul, kategori, status
+                    FROM dokumen_hukum
+                    WHERE deleted_at IS NULL
+                `;
+                const queryParams = [];
+                if (searchStr) {
+                    docSql += ` AND (LOWER(judul) LIKE $1 OR LOWER(nomor) LIKE $1 OR CAST(tahun AS TEXT) LIKE $1)`;
+                    queryParams.push(`%${searchStr}%`);
+                }
+                docSql += ` ORDER BY id DESC LIMIT 20`;
+                const docRes = await pool.query(docSql, queryParams);
+                return docRes.rows.map((d) => ({
+                    value: String(d.id),
+                    label: `${d.nomor ? `Nomor ${d.nomor} ` : ""}${d.tahun ? `Tahun ${d.tahun} ` : ""}- ${d.judul}`,
+                    subLabel: `${d.kategori || "Peraturan"} (${d.status || "Berlaku"})`,
+                }));
+            } catch (err) {
+                return [];
+            }
         }
         if (t === "tahun") {
             const fromDbYears = await fetchDbDistinct("tahun");

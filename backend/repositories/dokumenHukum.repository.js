@@ -98,36 +98,44 @@ const findAll = async ({
 const findById = async (id) => {
     const query = `
         SELECT
-            id,
-            judul,
-            kategori,
-            nomor,
-            tahun,
-            file_abstrak,
-            file_dokumen,
-            bidang,
-            tipe_dokumen,
-            tempat_penetapan,
-            tanggal_penetapan,
-            tanggal_pengundangan,
-            tanggal_berlaku,
-            sumber,
-            subjek,
-            status,
-            pemrakarsa,
-            penanggung_jawab,
-            nomor_rancangan,
-            urgensi,
-            dasar_hukum,
-            ringkasan,
-            draft_id,
-            dilihat,
-            download,
-            created_at,
-            updated_at
-        FROM dokumen_hukum
-        WHERE id = $1
-          AND deleted_at IS NULL
+            d.id,
+            d.judul,
+            d.kategori,
+            d.nomor,
+            d.tahun,
+            d.file_abstrak,
+            d.file_dokumen,
+            d.bidang,
+            d.tipe_dokumen,
+            d.tempat_penetapan,
+            d.tanggal_penetapan,
+            d.tanggal_pengundangan,
+            d.tanggal_berlaku,
+            d.sumber,
+            d.subjek,
+            d.status,
+            d.pemrakarsa,
+            d.penanggung_jawab,
+            d.nomor_rancangan,
+            d.urgensi,
+            d.dasar_hukum,
+            d.ringkasan,
+            d.draft_id,
+            d.dokumen_terkait_id,
+            d.catatan_status_relasi,
+            d.dilihat,
+            d.download,
+            d.created_at,
+            d.updated_at,
+            rel.judul AS dokumen_terkait_judul,
+            rel.nomor AS dokumen_terkait_nomor,
+            rel.tahun AS dokumen_terkait_tahun,
+            rel.kategori AS dokumen_terkait_kategori,
+            rel.status AS dokumen_terkait_status
+        FROM dokumen_hukum d
+        LEFT JOIN dokumen_hukum rel ON d.dokumen_terkait_id = rel.id
+        WHERE d.id = $1
+          AND d.deleted_at IS NULL
         LIMIT 1
     `;
 
@@ -156,6 +164,8 @@ const create = async ({
     sumber = null,
     subject = null,
     status,
+    dokumen_terkait_id = null,
+    catatan_status_relasi = null,
 }) => {
     const query = `
     INSERT INTO dokumen_hukum (
@@ -173,7 +183,9 @@ const create = async ({
       tanggal_berlaku,
       sumber,
       subjek,
-      status
+      status,
+      dokumen_terkait_id,
+      catatan_status_relasi
     )
     VALUES (
       $1,
@@ -190,7 +202,9 @@ const create = async ({
       $12,
       $13,
       $14,
-      $15
+      $15,
+      $16,
+      $17
     )
     RETURNING *
   `;
@@ -211,6 +225,8 @@ const create = async ({
         sumber || null,
         subject || null,
         status,
+        dokumen_terkait_id || null,
+        catatan_status_relasi || null,
     ]);
 
     return result.rows[0];
@@ -235,6 +251,8 @@ const update = async (
         sumber,
         subject,
         status,
+        dokumen_terkait_id,
+        catatan_status_relasi,
     }
 ) => {
     const query = `
@@ -260,9 +278,11 @@ const update = async (
             sumber = $13,
             subjek = $14,
             status = $15,
+            dokumen_terkait_id = $16,
+            catatan_status_relasi = $17,
             updated_at = CURRENT_TIMESTAMP
 
-        WHERE id = $16
+        WHERE id = $18
           AND deleted_at IS NULL
 
         RETURNING *
@@ -286,6 +306,8 @@ const update = async (
             sumber,
             subject,
             status,
+            dokumen_terkait_id || null,
+            catatan_status_relasi || null,
             id,
         ]
     );

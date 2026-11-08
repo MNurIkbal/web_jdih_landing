@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const jwt = require("jsonwebtoken");
+const pool = require("../config/database");
 const pengajuanService = require("../services/pengajuanPeraturan.service");
 const { invalidateCache } = require("../config/redis");
 const { applyWatermark } = require("../utils/pdfWatermark");
@@ -31,7 +32,6 @@ const getAll = async (req, res) => {
                 userRole = (decoded?.role || "").toLowerCase();
             }
         } catch (e) {
-            // Abaikan jika token gagal decode
         }
 
         const result = await pengajuanService.getAll({
@@ -58,7 +58,6 @@ const getById = async (req, res) => {
     try {
         let result = await pengajuanService.getById(req.params.id);
         
-        // Cek jika yang membuka adalah admin/verifikator dan status masih Submit Dokumen atau Pengajuan Ulang
         try {
             const token = req.cookies?.access_token || req.headers?.authorization?.replace("Bearer ", "");
             if (token) {
@@ -73,7 +72,6 @@ const getById = async (req, res) => {
                 }
             }
         } catch (e) {
-            // Abaikan jika token gagal decode
         }
 
         return res.status(200).json({
@@ -88,7 +86,6 @@ const getById = async (req, res) => {
     }
 };
 
-// Tahap 1: Pengajuan Baru
 const create = async (req, res) => {
     try {
         const {
@@ -238,8 +235,14 @@ const update = async (req, res) => {
 // Update Tahapan umum & Verifikasi
 const updateTahapan = async (req, res) => {
     try {
-        const { tahapan, status, catatan_verifikasi } = req.body;
-        const result = await pengajuanService.updateTahap(req.params.id, tahapan, status, catatan_verifikasi);
+        const { tahapan, status, catatan_verifikasi, status_penunjukan_pejabat } = req.body;
+        const result = await pengajuanService.updateTahap(
+            req.params.id,
+            tahapan,
+            status,
+            catatan_verifikasi,
+            status_penunjukan_pejabat
+        );
         return res.status(200).json({
             success: true,
             message: "Tahapan pengajuan berhasil diperbarui",
@@ -309,13 +312,32 @@ const deletePembahasan = async (req, res) => {
 // Tahap 3: Harmonisasi
 const submitHarmonisasi = async (req, res) => {
     try {
-        const { status_harmonisasi, catatan_harmonisasi } = req.body;
+        const {
+            status_harmonisasi,
+            catatan_harmonisasi,
+            chat_history,
+            conflict_findings,
+            warning_alert,
+        } = req.body;
         const fileHarmonisasi = req.file?.filename || null;
+
+        let parsedChatHistory = chat_history;
+        if (typeof chat_history === "string") {
+            try { parsedChatHistory = JSON.parse(chat_history); } catch (e) {}
+        }
+
+        let parsedConflictFindings = conflict_findings;
+        if (typeof conflict_findings === "string") {
+            try { parsedConflictFindings = JSON.parse(conflict_findings); } catch (e) {}
+        }
 
         const result = await pengajuanService.submitHarmonisasi(req.params.id, {
             status_harmonisasi,
             catatan_harmonisasi,
             file_harmonisasi: fileHarmonisasi,
+            chat_history: parsedChatHistory,
+            conflict_findings: parsedConflictFindings,
+            warning_alert,
         });
 
         return res.status(200).json({
@@ -681,91 +703,69 @@ const getAnnotatedDraftPdf = async (req, res) => {
         const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const pages = pdfDoc.getPages();
 
-        // Anotasi coretan background kuning & badge nomor jika ada potensi benturan
+        // Ambil conflict findings dari query param atau database jika tersimpan
+        let customFindings = [];
+        if (req.query.findings) {
+            try {
+                customFindings = JSON.parse(decodeURIComponent(req.query.findings));
+            } catch (e) {}
+        }
+        if (!customFindings.length && draft.harmonisasi_conflict_findings) {
+            customFindings = Array.isArray(draft.harmonisasi_conflict_findings)
+                ? draft.harmonisasi_conflict_findings
+                : [];
+        }
+
+        // Background kuning stabilo transparan (highlight teks) dan header petunjuk ringkas (No dan Judul saja)
         if (pages.length > 0) {
-            // Anotasi 1 pada Halaman 1 (selalu terlihat di halaman awal)
-            const targetPage1 = pages[0];
-            const { width: w1, height: h1 } = targetPage1.getSize();
+            const findingsToDraw = customFindings.length > 0 ? customFindings : [
+                {
+                    pasal: "Klausul Draf",
+                    kategoriBenturan: "Potensi Benturan Norma",
+                    regulasiAcuan: "Regulasi Terkait",
+                    rekomendasiRevisi: "Lakukan perbaikan rumusan klausul.",
+                    pageNumber: 1,
+                }
+            ];
 
-            // Background Coretan Kuning Stabilo
-            targetPage1.drawRectangle({
-                x: 40,
-                y: h1 > 350 ? h1 - 320 : 80,
-                width: w1 - 80,
-                height: 120,
-                color: rgb(1, 0.94, 0.28), // Kuning stabilo
-                opacity: 0.38,
-                borderColor: rgb(0.85, 0.65, 0),
-                borderWidth: 1.5,
-            });
+            findingsToDraw.slice(0, Math.min(3, pages.length)).forEach((f, idx) => {
+                const targetPageIdx = Math.min((f.pageNumber || (idx + 1)) - 1, pages.length - 1);
+                const targetPage = pages[targetPageIdx];
+                const { width, height } = targetPage.getSize();
 
-            // Badge Nomor & Pesan Peringatan di Atas Coretan
-            targetPage1.drawRectangle({
-                x: 40,
-                y: (h1 > 350 ? h1 - 320 : 80) + 120,
-                width: Math.min(380, w1 - 80),
-                height: 24,
-                color: rgb(0.9, 0.2, 0.2), // Merah peringatan
-                opacity: 0.95,
-            });
+                const boxY = height > 350 ? height - 320 - (idx === 1 ? 40 : 0) : 80;
 
-            targetPage1.drawText("[ 1 ] PERINGATAN: TUMPANG TINDIH WEWENANG", {
-                x: 50,
-                y: (h1 > 350 ? h1 - 320 : 80) + 127,
-                size: 9.5,
-                font: fontBold,
-                color: rgb(1, 1, 1),
-            });
-
-            targetPage1.drawText("Benturan: Perpres No. 90/2012. Tambahkan klausul pembatas wewenang.", {
-                x: 50,
-                y: (h1 > 350 ? h1 - 320 : 80) + 98,
-                size: 8,
-                font: fontReg,
-                color: rgb(0.7, 0.1, 0.1),
-            });
-
-            // Anotasi 2 pada Halaman 2 jika tersedia
-            if (pages.length > 1) {
-                const targetPage2 = pages[1];
-                const { width: w2, height: h2 } = targetPage2.getSize();
-
-                targetPage2.drawRectangle({
+                // 1. Highlight Kuning Stabilo Murni pada Blok Teks (Tanpa Border Kotak, Opasitas Lembut agar Teks Terbaca Jelas)
+                targetPage.drawRectangle({
                     x: 40,
-                    y: h2 > 350 ? h2 - 300 : 90,
-                    width: w2 - 80,
-                    height: 100,
-                    color: rgb(1, 0.94, 0.28),
-                    opacity: 0.38,
-                    borderColor: rgb(0.85, 0.65, 0),
-                    borderWidth: 1.5,
+                    y: boxY,
+                    width: width - 80,
+                    height: 105,
+                    color: rgb(1, 0.94, 0.28), // Kuning stabilo
+                    opacity: 0.30,             // Opasitas lembut persis stabilo naskah asli
                 });
 
-                targetPage2.drawRectangle({
+                const bannerHeight = 22;
+                targetPage.drawRectangle({
                     x: 40,
-                    y: (h2 > 350 ? h2 - 300 : 90) + 100,
-                    width: Math.min(360, w2 - 80),
-                    height: 24,
-                    color: rgb(0.9, 0.5, 0.1), // Oranye peringatan
+                    y: boxY + 105,
+                    width: Math.min(380, width - 80),
+                    height: bannerHeight,
+                    color: rgb(0.88, 0.24, 0.18),
                     opacity: 0.95,
                 });
 
-                targetPage2.drawText("[ 2 ] PERINGATAN: PENEGASAN HIERARKI HUKUM", {
-                    x: 50,
-                    y: (h2 > 350 ? h2 - 300 : 90) + 107,
-                    size: 9.5,
+                // Teks Ramping: Hanya [ No ] Petunjuk: [ Judul Klausul ]
+                const cleanJudul = String(f.pasal || `Klausul ${idx + 1}`).trim().slice(0, 42);
+                const badgeText = `[ ${idx + 1} ] PETUNJUK: ${cleanJudul.toUpperCase()}`;
+                targetPage.drawText(badgeText, {
+                    x: 48,
+                    y: boxY + 112,
+                    size: 9,
                     font: fontBold,
                     color: rgb(1, 1, 1),
                 });
-
-                targetPage2.drawText("Benturan: UU No. 17/2011. Wajib tunduk pada hierarki undang-undang.", {
-                    x: 50,
-                    y: (h2 > 350 ? h2 - 300 : 90) + 78,
-                    size: 8,
-                    font: fontReg,
-                    color: rgb(0.7, 0.25, 0),
-                });
-            }
+            });
         }
 
         const annotatedPdfBytes = await pdfDoc.save();
@@ -795,6 +795,18 @@ const uploadRevisedPdf = async (req, res) => {
         const result = await pengajuanService.update(id, {
             file_draft: newFileName,
         });
+
+        // Ketika file draf perbaikan diunggah, otomatis bersihkan temuan konflik, petunjuk perbaikan, dan peringatan lama dari database
+        // karena draf telah diperbarui dengan file baru (kecuali nanti diuji harmonisasi kembali)
+        await pool.query(
+            `UPDATE draft_peraturan 
+             SET harmonisasi_conflict_findings = NULL,
+                 harmonisasi_warning_alert = NULL,
+                 status_harmonisasi = 'Harmonisasi Selesai Disetujui',
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [id]
+        );
 
         await invalidateCache("pengajuan:*");
 

@@ -82,6 +82,19 @@ import { fetchDokumenHukum } from "@/feature/dokumen-hukum/api/DokumenHukum.serv
 import { useDokumenHukumList } from "@/feature/dokumen-hukum/hooks/DokumenHukum.hooks";
 import { SessionHook } from "@/feature/web";
 import { generatePeraturanPdfBlob } from "../utils/pdfGenerator";
+import dynamic from "next/dynamic";
+
+const FormCKEditorClient = dynamic(
+  () => import("@/components/ui/FormCKEditorClient"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-64 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-400">
+        Memuat CKEditor...
+      </div>
+    ),
+  }
+);
 
 const TAHAPAN_STEPS: { stage: TahapanPeraturan; number: number; label: string; desc: string }[] = [
   { stage: "Pengajuan", number: 1, label: "Pengajuan", desc: "Drafting & Naskah Akademik" },
@@ -152,7 +165,6 @@ export default function PengajuanPeraturanComponent({
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
   const deleteMutation = useDeletePengajuan();
 
-  // Filter tahapan HDH hanya aktif otomatis di modul HDH; jika di modul JDIH bebas/tanpa filter default
   React.useEffect(() => {
     if (activeModule === "HDH") {
       setTahapanFilter("Harmonisasi");
@@ -169,7 +181,6 @@ export default function PengajuanPeraturanComponent({
   });
 
   const rawItems: PengajuanPeraturan[] = (data as any)?.data || [];
-  // Jika role adalah admin / verifikator, jangan tampilkan data pengajuan dengan status Draft, Ditolak, Revisi, atau Ditetapkan/Selesai
   const items = useMemo(() => {
     if (userRole === "admin") {
       const hiddenStatuses = ["Draft", "Ditolak", "Revisi", "Ditetapkan", "Selesai"];
@@ -484,15 +495,14 @@ export default function PengajuanPeraturanComponent({
                       <span className="flex items-center gap-1.5">
                         <span>Status:</span>
                         <strong
-                          className={`px-2 py-0.5 rounded-md border text-[11px] ${
-                            row.status === "Draft"
+                          className={`px-2 py-0.5 rounded-md border text-[11px] ${row.status === "Draft"
                               ? "bg-slate-100 text-slate-700 border-slate-200"
                               : row.status === "Submit Dokumen" || row.status === "Review"
-                              ? "bg-amber-50 text-amber-800 border-amber-200"
-                              : row.status === "Revisi"
-                              ? "bg-rose-50 text-rose-700 border-rose-200"
-                              : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                          }`}
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : row.status === "Revisi"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            }`}
                         >
                           {row.status}
                         </strong>
@@ -506,22 +516,20 @@ export default function PengajuanPeraturanComponent({
                         return (
                           <div
                             key={s.number}
-                            className={`rounded-xl p-2.5 border text-center transition ${
-                              isCurrent
+                            className={`rounded-xl p-2.5 border text-center transition ${isCurrent
                                 ? "border-blue-500 bg-blue-50/70 text-blue-900 ring-1 ring-blue-500"
                                 : isDone
-                                ? "border-emerald-200 bg-emerald-50/50 text-emerald-800"
-                                : "border-slate-200 bg-slate-50/60 text-slate-400"
-                            }`}
+                                  ? "border-emerald-200 bg-emerald-50/50 text-emerald-800"
+                                  : "border-slate-200 bg-slate-50/60 text-slate-400"
+                              }`}
                           >
                             <div className="flex items-center justify-center gap-1 text-[11px] font-bold">
                               {isDone ? (
                                 <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
                               ) : (
                                 <span
-                                  className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${
-                                    isCurrent ? "bg-blue-600 text-white" : "bg-slate-300 text-slate-600"
-                                  }`}
+                                  className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${isCurrent ? "bg-blue-600 text-white" : "bg-slate-300 text-slate-600"
+                                    }`}
                                 >
                                   {s.number}
                                 </span>
@@ -1239,29 +1247,27 @@ function DetailTahapanModal({
                     activeModule === "HDH" && step.stage !== "Harmonisasi"
                       ? "Tahapan ini dikelola di Modul JDIH"
                       : activeModule === "JDIH" && step.stage === "Harmonisasi"
-                      ? "Tahap Harmonisasi khusus dibuka melalui Modul HDH"
-                      : undefined
+                        ? "Tahap Harmonisasi khusus dibuka melalui Modul HDH"
+                        : undefined
                   }
-                  className={`flex flex-1 min-w-[145px] sm:min-w-[170px] items-center gap-2 sm:gap-3 rounded-xl border p-2 sm:p-3 text-left transition shrink-0 ${
-                    isActive
+                  className={`flex flex-1 min-w-[145px] sm:min-w-[170px] items-center gap-2 sm:gap-3 rounded-xl border p-2 sm:p-3 text-left transition shrink-0 ${isActive
                       ? activeModule === "HDH"
                         ? "border-amber-600 bg-amber-50/60 text-amber-800 shadow-sm ring-1 ring-amber-500 cursor-pointer"
                         : "border-blue-600 bg-blue-50/60 text-blue-800 shadow-sm ring-1 ring-blue-500 cursor-pointer"
                       : isStepAccessible
-                      ? "border-slate-200/80 text-slate-700 hover:bg-slate-50 cursor-pointer"
-                      : "border-slate-100 bg-slate-50/60 text-slate-400 opacity-60 cursor-not-allowed"
-                  }`}
+                        ? "border-slate-200/80 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        : "border-slate-100 bg-slate-50/60 text-slate-400 opacity-60 cursor-not-allowed"
+                    }`}
                 >
                   <div
-                    className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
-                      isActive
+                    className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${isActive
                         ? activeModule === "HDH"
                           ? "bg-amber-600 text-white"
                           : "bg-blue-600 text-white"
                         : isPast
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-200 text-slate-400"
-                    }`}
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-200 text-slate-400"
+                      }`}
                   >
                     {isPast && !isActive ? (
                       <CheckCircle2 size={16} />
@@ -1285,7 +1291,7 @@ function DetailTahapanModal({
 
         {/* Stage Content Area Fullscreen - Full width & scrollbar di pojok kanan layar */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar">
-          <div className="w-full px-3.5 sm:px-6 md:px-8 lg:px-12 py-5 sm:py-6 lg:py-8 max-w-7xl mx-auto">
+          <div className="w-full px-3.5 sm:px-6 md:px-8 lg:px-10 py-4 sm:py-6">
             {activeTab === "Pengajuan" && (
               <TabPengajuan
                 draft={draft}
@@ -1332,7 +1338,7 @@ function TabPengajuan({
 
   const { mutate: updateTahap, isPending } = useUpdateTahapanPengajuan();
   const [activeTabMode, setActiveTabMode] = useState<"detail" | "verifikasi">("detail");
-  
+
   // State verifikasi
   const [verifStatus, setVerifStatus] = useState<"Disetujui" | "Ditolak">("Disetujui");
   const [verifCatatan, setVerifCatatan] = useState("");
@@ -1456,15 +1462,14 @@ function TabPengajuan({
           <p className="mt-1 text-xs text-blue-700">
             Status pengajuan:{" "}
             <span
-              className={`inline-block font-bold px-2 py-0.5 rounded-md text-[11px] border ${
-                draft.status === "Draft"
+              className={`inline-block font-bold px-2 py-0.5 rounded-md text-[11px] border ${draft.status === "Draft"
                   ? "bg-slate-100 text-slate-700 border-slate-300"
                   : isDitolak
-                  ? "bg-rose-100 text-rose-800 border-rose-300"
-                  : draft.status === "Review"
-                  ? "bg-amber-100 text-amber-800 border-amber-300"
-                  : "bg-blue-100 text-blue-800 border-blue-300"
-              }`}
+                    ? "bg-rose-100 text-rose-800 border-rose-300"
+                    : draft.status === "Review"
+                      ? "bg-amber-100 text-amber-800 border-amber-300"
+                      : "bg-blue-100 text-blue-800 border-blue-300"
+                }`}
             >
               {draft.status}
             </span>
@@ -1489,8 +1494,8 @@ function TabPengajuan({
                 {isPending
                   ? "Mengirim..."
                   : isDitolak
-                  ? "Kirim Pengajuan Ulang"
-                  : "Submit Dokumen ke Verifikator"}
+                    ? "Kirim Pengajuan Ulang"
+                    : "Submit Dokumen ke Verifikator"}
               </span>
               <ArrowRight size={14} />
             </button>
@@ -1518,11 +1523,10 @@ function TabPengajuan({
           <button
             type="button"
             onClick={() => setActiveTabMode("detail")}
-            className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${
-              activeTabMode === "detail"
+            className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTabMode === "detail"
                 ? "border-blue-600 text-blue-700"
                 : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             Tab 1: Rincian Lengkap Data Pengajuan
           </button>
@@ -1531,11 +1535,10 @@ function TabPengajuan({
             <button
               type="button"
               onClick={() => setActiveTabMode("verifikasi")}
-              className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer flex items-center gap-1.5 ${
-                activeTabMode === "verifikasi"
+              className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer flex items-center gap-1.5 ${activeTabMode === "verifikasi"
                   ? "border-blue-600 text-blue-700"
                   : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
+                }`}
             >
               <span>Tab 2: Verifikasi & Tindak Lanjut</span>
               {isMenungguVerifikasi && (
@@ -1568,11 +1571,10 @@ function TabPengajuan({
                 <button
                   type="button"
                   onClick={() => setVerifStatus("Disetujui")}
-                  className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition cursor-pointer ${
-                    verifStatus === "Disetujui"
+                  className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition cursor-pointer ${verifStatus === "Disetujui"
                       ? "border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500 text-emerald-900"
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <CheckCircle2
@@ -1590,11 +1592,10 @@ function TabPengajuan({
                 <button
                   type="button"
                   onClick={() => setVerifStatus("Ditolak")}
-                  className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition cursor-pointer ${
-                    verifStatus === "Ditolak"
+                  className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition cursor-pointer ${verifStatus === "Ditolak"
                       ? "border-rose-500 bg-rose-50/60 ring-1 ring-rose-500 text-rose-900"
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <X
@@ -1634,11 +1635,10 @@ function TabPengajuan({
                     ? "Contoh: Alasan penolakan dokumen pengajuan rancangan peraturan..."
                     : "Tuliskan catatan apresiasi atau arahan teknis untuk rapat pembahasan (opsional)..."
                 }
-                className={`w-full rounded-xl border p-3.5 text-xs text-slate-800 focus:outline-none transition ${
-                  verifErrors.catatan
+                className={`w-full rounded-xl border p-3.5 text-xs text-slate-800 focus:outline-none transition ${verifErrors.catatan
                     ? "border-rose-400 bg-rose-50/20 focus:ring-1 focus:ring-rose-500"
                     : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                }`}
+                  }`}
               />
               {verifErrors.catatan && (
                 <p className="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
@@ -1652,11 +1652,10 @@ function TabPengajuan({
               <button
                 type="submit"
                 disabled={isPending}
-                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow transition cursor-pointer ${
-                  verifStatus === "Disetujui"
+                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow transition cursor-pointer ${verifStatus === "Disetujui"
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-rose-600 hover:bg-rose-700"
-                } disabled:opacity-50`}
+                  } disabled:opacity-50`}
               >
                 {isPending ? (
                   <span>Menyimpan Keputusan...</span>
@@ -1985,11 +1984,10 @@ function TabPembahasan({
             type="button"
             disabled={isUpdatingTahap || pembahasanList.length === 0}
             onClick={handleLanjutKeHarmonisasi}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold shadow-sm transition shrink-0 ${
-              pembahasanList.length === 0
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold shadow-sm transition shrink-0 ${pembahasanList.length === 0
                 ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                 : "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-            }`}
+              }`}
           >
             <span>{isUpdatingTahap ? "Memproses..." : "Lanjut ke Tahap Harmonisasi"}</span>
             <ArrowRight size={14} />
@@ -2003,143 +2001,142 @@ function TabPembahasan({
           onSubmit={handleUploadRapat}
           className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
         >
-        <h5 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-          <Upload size={15} className="text-blue-600" />
-          <span>Input Data Hasil Rapat Pembahasan</span>
-        </h5>
+          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <Upload size={15} className="text-blue-600" />
+            <span>Input Data Hasil Rapat Pembahasan</span>
+          </h5>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Judul Rapat / Agenda <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={judulRapat}
-              onChange={(e) => {
-                setJudulRapat(e.target.value);
-                if (pembahasanErrors.judul_rapat) {
-                  setPembahasanErrors((prev) => ({ ...prev, judul_rapat: undefined }));
-                }
-              }}
-              placeholder="Contoh: Rapat Pleno I Pembahasan Pasal 1-10"
-              className={`mt-1 w-full rounded-xl border bg-white px-3.5 py-2 text-xs focus:outline-none transition ${
-                pembahasanErrors.judul_rapat
-                  ? "border-rose-400 bg-rose-50/20 focus:ring-1 focus:ring-rose-500"
-                  : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              }`}
-            />
-            {pembahasanErrors.judul_rapat && (
-              <p className="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
-                <AlertTriangle size={12} />
-                <span>{pembahasanErrors.judul_rapat}</span>
-              </p>
-            )}
-          </div>
-
-          <div>
-            <FormDatePicker
-              label="Tanggal Rapat"
-              required
-              value={tanggalRapat}
-              onChange={(val) => {
-                setTanggalRapat(val);
-                if (pembahasanErrors.tanggal_rapat) {
-                  setPembahasanErrors((prev) => ({ ...prev, tanggal_rapat: undefined }));
-                }
-              }}
-              placeholder="Pilih tanggal rapat..."
-              error={pembahasanErrors.tanggal_rapat}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Lokasi / Tempat Rapat
-            </label>
-            <input
-              type="text"
-              value={lokasi}
-              onChange={(e) => setLokasi(e.target.value)}
-              placeholder="Contoh: Ruang Rapat Biro Hukum / Zoom Meeting"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-xs font-semibold text-slate-700">
-            Keterangan & Catatan Rapat
-          </label>
-          <textarea
-            rows={2}
-            value={keterangan}
-            onChange={(e) => setKeterangan(e.target.value)}
-            placeholder="Tuliskan poin-poin kesepakatan atau arahan hasil rapat..."
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs focus:border-blue-500 focus:outline-none"
-          />
-        </div>
-
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 pt-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Upload File Notulensi / Berita Acara <span className="text-rose-500">*</span>
-            </label>
-            <p className="text-[11px] text-slate-400 mb-1.5">
-              Format: PDF • Ukuran Maksimal 30 MB
-            </p>
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => {
-                const file = e.target.files?.[0] || null;
-                if (file && file.size > 30 * 1024 * 1024) {
-                  toast.error("Ukuran file tidak boleh melebihi 30 MB");
-                  e.target.value = "";
-                  return;
-                }
-                setFileNotulensi(file);
-                if (pembahasanErrors.file_notulensi) {
-                  setPembahasanErrors((prev) => ({ ...prev, file_notulensi: undefined }));
-                }
-              }}
-              className="block text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-            />
-            {pembahasanErrors.file_notulensi && (
-              <p className="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
-                <AlertTriangle size={12} />
-                <span>{pembahasanErrors.file_notulensi}</span>
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {fileNotulensi && (
-              <button
-                type="button"
-                onClick={() => {
-                  const url = URL.createObjectURL(fileNotulensi);
-                  setPreviewPdfUrl(url);
-                  setPreviewPdfTitle(`Pratinjau File: ${fileNotulensi.name}`);
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">
+                Judul Rapat / Agenda <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={judulRapat}
+                onChange={(e) => {
+                  setJudulRapat(e.target.value);
+                  if (pembahasanErrors.judul_rapat) {
+                    setPembahasanErrors((prev) => ({ ...prev, judul_rapat: undefined }));
+                  }
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer transition"
-              >
-                <Eye size={13} />
-                <span>Preview PDF</span>
-              </button>
-            )}
+                placeholder="Contoh: Rapat Pleno I Pembahasan Pasal 1-10"
+                className={`mt-1 w-full rounded-xl border bg-white px-3.5 py-2 text-xs focus:outline-none transition ${pembahasanErrors.judul_rapat
+                    ? "border-rose-400 bg-rose-50/20 focus:ring-1 focus:ring-rose-500"
+                    : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  }`}
+              />
+              {pembahasanErrors.judul_rapat && (
+                <p className="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  <span>{pembahasanErrors.judul_rapat}</span>
+                </p>
+              )}
+            </div>
 
-            <button
-              type="submit"
-              disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
-            >
-              <Upload size={14} />
-              {isPending ? "Mengunggah..." : "Simpan Hasil Rapat"}
-            </button>
+            <div>
+              <FormDatePicker
+                label="Tanggal Rapat"
+                required
+                value={tanggalRapat}
+                onChange={(val) => {
+                  setTanggalRapat(val);
+                  if (pembahasanErrors.tanggal_rapat) {
+                    setPembahasanErrors((prev) => ({ ...prev, tanggal_rapat: undefined }));
+                  }
+                }}
+                placeholder="Pilih tanggal rapat..."
+                error={pembahasanErrors.tanggal_rapat}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">
+                Lokasi / Tempat Rapat
+              </label>
+              <input
+                type="text"
+                value={lokasi}
+                onChange={(e) => setLokasi(e.target.value)}
+                placeholder="Contoh: Ruang Rapat Biro Hukum / Zoom Meeting"
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none"
+              />
+            </div>
           </div>
-        </div>
-      </form>
+
+          <div className="mt-4">
+            <label className="block text-xs font-semibold text-slate-700">
+              Keterangan & Catatan Rapat
+            </label>
+            <textarea
+              rows={2}
+              value={keterangan}
+              onChange={(e) => setKeterangan(e.target.value)}
+              placeholder="Tuliskan poin-poin kesepakatan atau arahan hasil rapat..."
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 pt-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">
+                Upload File Notulensi / Berita Acara <span className="text-rose-500">*</span>
+              </label>
+              <p className="text-[11px] text-slate-400 mb-1.5">
+                Format: PDF • Ukuran Maksimal 30 MB
+              </p>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (file && file.size > 30 * 1024 * 1024) {
+                    toast.error("Ukuran file tidak boleh melebihi 30 MB");
+                    e.target.value = "";
+                    return;
+                  }
+                  setFileNotulensi(file);
+                  if (pembahasanErrors.file_notulensi) {
+                    setPembahasanErrors((prev) => ({ ...prev, file_notulensi: undefined }));
+                  }
+                }}
+                className="block text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+              {pembahasanErrors.file_notulensi && (
+                <p className="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
+                  <AlertTriangle size={12} />
+                  <span>{pembahasanErrors.file_notulensi}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {fileNotulensi && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = URL.createObjectURL(fileNotulensi);
+                    setPreviewPdfUrl(url);
+                    setPreviewPdfTitle(`Pratinjau File: ${fileNotulensi.name}`);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer transition"
+                >
+                  <Eye size={13} />
+                  <span>Preview PDF</span>
+                </button>
+              )}
+
+              <button
+                type="submit"
+                disabled={isPending}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+              >
+                <Upload size={14} />
+                {isPending ? "Mengunggah..." : "Simpan Hasil Rapat"}
+              </button>
+            </div>
+          </div>
+        </form>
       )}
 
       {/* List Hasil Rapat */}
@@ -2257,6 +2254,7 @@ function TabHarmonisasi({
   draft: PengajuanPeraturan;
   onNext?: () => void;
 }) {
+  const backendUrl = process.env.NEXT_PUBLIC_APP_BACKEND_URL || "http://localhost:8080";
   const session = SessionHook();
   const userRole = (session?.data?.data?.role || "superadmin").toLowerCase();
   const isAdmin = userRole === "admin";
@@ -2277,10 +2275,27 @@ function TabHarmonisasi({
   const [catatan, setCatatan] = useState(draft.catatan_harmonisasi || "");
   const [fileHarmonisasi, setFileHarmonisasi] = useState<File | null>(null);
 
-  // State Konten Draf untuk Pratinjau Dokumen & Editor Perbaikan
-  const [drafBatangTubuh, setDrafBatangTubuh] = useState<string>(
-    `BAB I\nKETENTUAN UMUM\n\nPasal 1\nDalam Peraturan ini yang dimaksud dengan:\n1. Pengaturan Penyelenggaraan Intelijen adalah pedoman pelaksanaan fungsi strategis.\n2. Badan Intelijen Negara yang selanjutnya disingkat BIN adalah lini terdepan intelijen nasional.\n\nBAB II\nRUANG LINGKUP DAN PELAKSANAAN\n\nPasal 2\n(1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, dan akuntabilitas.\n(2) Ketentuan teknis diselenggarakan dengan memperhatikan keselarasan terhadap peraturan perundang-undangan yang lebih tinggi.\n\nBAB III\nKETENTUAN PENUTUP\n\nPasal 3\nPeraturan ini mulai berlaku pada tanggal diundangkan.`
-  );
+  // State Konten Draf untuk Pratinjau Dokumen & Editor Perbaikan (Format HTML untuk CKEditor)
+  const initialHtmlDraft = useMemo(() => {
+    return `<h3>BAB I<br>KETENTUAN UMUM</h3>
+<p style="text-align: center;"><strong>Pasal 1</strong></p>
+<p>Dalam Peraturan ini yang dimaksud dengan:</p>
+<ol>
+  <li>Pengaturan Penyelenggaraan Intelijen adalah pedoman pelaksanaan fungsi strategis di lingkungan Badan Intelijen Negara.</li>
+  <li>Badan Intelijen Negara yang selanjutnya disingkat BIN adalah lini terdepan penyelenggara intelijen nasional.</li>
+</ol>
+<br>
+<h3>BAB II<br>RUANG LINGKUP DAN PELAKSANAAN</h3>
+<p style="text-align: center;"><strong>Pasal 2</strong></p>
+<p>(1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, kepastian hukum, dan akuntabilitas publik.</p>
+<p>(2) Ketentuan teknis diselenggarakan dengan memperhatikan keselarasan terhadap peraturan perundang-undangan yang lebih tinggi.</p>
+<br>
+<h3>BAB III<br>KETENTUAN PENUTUP</h3>
+<p style="text-align: center;"><strong>Pasal 3</strong></p>
+<p>Peraturan ini mulai berlaku pada tanggal diundangkan dan memiliki kekuatan hukum mengikat.</p>`;
+  }, []);
+
+  const [drafBatangTubuh, setDrafBatangTubuh] = useState<string>(initialHtmlDraft);
 
   // State Blob PDF Pratinjau
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
@@ -2522,33 +2537,27 @@ Instruksi / Pertanyaan: ${text}`;
     );
   };
 
-  // Fungsi Perbaikan Otomatis Draf
   const handlePerbaikiOtomatis = async () => {
     setIsAiLoading(true);
 
-    const updatedText = `BAB I
-KETENTUAN UMUM
-
-Pasal 1
-Dalam Peraturan ini yang dimaksud dengan:
-1. Pengaturan Penyelenggaraan Intelijen adalah pedoman teknis pelaksanaan fungsi strategis.
-2. Badan Intelijen Negara yang selanjutnya disingkat BIN adalah lini terdepan intelijen nasional.
-
-BAB II
-RUANG LINGKUP DAN PENYELARASAN WEWENANG
-
-Pasal 2
-(1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, dan kepastian hukum.
-(2) Penyelenggaraan fungsi teknis dalam Peraturan ini tidak mengurangi atau membatasi kewenangan koordinasi intelijen nasional sebagaimana ditetapkan dalam Peraturan Presiden Nomor 90 Tahun 2012.
-
-BAB III
-KETENTUAN PERALIHAN DAN PENUTUP
-
-Pasal 3
-Segala ketentuan teknis operasional wajib diselaraskan dan tunduk pada hierarki Undang-Undang Nomor 17 Tahun 2011 tentang Intelijen Negara serta peraturan perundang-undangan yang lebih tinggi.
-
-Pasal 4
-Peraturan ini mulai berlaku pada tanggal diundangkan.`;
+    const updatedText = `<h3>BAB I<br>KETENTUAN UMUM</h3>
+<p style="text-align: center;"><strong>Pasal 1</strong></p>
+<p>Dalam Peraturan ini yang dimaksud dengan:</p>
+<ol>
+  <li>Pengaturan Penyelenggaraan Intelijen adalah pedoman teknis pelaksanaan fungsi strategis di lingkungan intelijen negara.</li>
+  <li>Badan Intelijen Negara yang selanjutnya disingkat BIN adalah lini terdepan penyelenggara intelijen nasional.</li>
+</ol>
+<br>
+<h3>BAB II<br>RUANG LINGKUP DAN PENYELARASAN WEWENANG</h3>
+<p style="text-align: center;"><strong>Pasal 2</strong></p>
+<p>(1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, dan kepastian hukum.</p>
+<p>(2) Penyelenggaraan fungsi teknis dalam Peraturan ini tidak mengurangi atau membatasi kewenangan koordinasi intelijen nasional sebagaimana ditetapkan dalam Peraturan Presiden Nomor 90 Tahun 2012.</p>
+<br>
+<h3>BAB III<br>KETENTUAN PERALIHAN DAN PENUTUP</h3>
+<p style="text-align: center;"><strong>Pasal 3</strong></p>
+<p>Segala ketentuan teknis operasional wajib diselaraskan dan tunduk pada hierarki Undang-Undang Nomor 17 Tahun 2011 tentang Intelijen Negara serta peraturan perundang-undangan yang lebih tinggi.</p>
+<p style="text-align: center;"><strong>Pasal 4</strong></p>
+<p>Peraturan ini mulai berlaku pada tanggal diundangkan.</p>`;
 
     setDrafBatangTubuh(updatedText);
     setAiWarningAlert(null);
@@ -2562,7 +2571,7 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
     setChatMessages((prev) => [
       ...prev,
       {
-        id: "repaired-" + Date.now(),
+        id: `repaired-${Date.now()}`,
         role: "assistant",
         text: `### ✅ Draf Regulasi Berhasil Diselaraskan Secara Otomatis!
 
@@ -2578,7 +2587,6 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
     setIsAiLoading(false);
   };
 
-  // Simpan Perbaikan Manual dari Editor
   const handleSimpanPerbaikanManual = async () => {
     await refreshPdfPreview(drafBatangTubuh);
     setAiWarningAlert(null);
@@ -2647,7 +2655,6 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header Info Komparasi Harmonisasi */}
       <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50/70 via-blue-50/50 to-indigo-50/60 p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-3 sm:gap-3.5">
@@ -2667,7 +2674,6 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* Tombol Unduh PDF Draf Hasil Penyelarasan */}
             <button
               type="button"
               onClick={handleDownloadPdfResmi}
@@ -2678,8 +2684,6 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
               <Download size={14} className="text-rose-600 sm:w-[15px] sm:h-[15px]" />
               <span>{isGeneratingPdf ? "Menyiapkan PDF..." : "Unduh PDF Draf"}</span>
             </button>
-
-            {/* Tombol Uji Harmonisasi */}
             <button
               type="button"
               onClick={handleAutoAnalyze}
@@ -2695,11 +2699,10 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
                 type="button"
                 onClick={handleLanjutKePersetujuan}
                 disabled={!isBolehLanjutPersetujuan || isUpdatingTahap}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold transition shadow-sm ${
-                  isBolehLanjutPersetujuan
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold transition shadow-sm ${isBolehLanjutPersetujuan
                     ? "bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
                     : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                }`}
+                  }`}
                 title={
                   aiWarningAlert
                     ? "Tombol dinonaktifkan karena ditemukan peringatan benturan/tumpang tindih hukum"
@@ -2759,8 +2762,10 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
         </div>
       )}
 
+      {/* Grid 2 Kolom: Kolom Kiri Chat Komparasi, Kolom Kanan Pratinjau Dokumen / Editor / Form */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
-        <div className="lg:col-span-6 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[540px] sm:h-[620px] lg:h-[720px]">
+        {/* Kolom Kiri: Chat Komparasi & Telaah Regulasi */}
+        <div className="lg:col-span-5 xl:col-span-5 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[620px] sm:h-[700px] lg:h-[780px]">
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-5 py-3 sm:py-3.5">
             <div className="flex items-center gap-2 sm:gap-2.5">
               <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-600 to-amber-700 text-white shadow-xs">
@@ -2801,22 +2806,20 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
                   className={`flex items-start gap-2 sm:gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}
                 >
                   <div
-                    className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
-                      isUser
+                    className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${isUser
                         ? "bg-slate-800 text-white"
                         : "bg-amber-600 text-white shadow-xs"
-                    }`}
+                      }`}
                   >
                     {isUser ? "Anda" : <Scale size={14} className="sm:w-4 sm:h-4" />}
                   </div>
                   <div
-                    className={`group relative max-w-[92%] sm:max-w-[85%] rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs leading-relaxed shadow-2xs ${
-                      isUser
+                    className={`group relative max-w-[92%] sm:max-w-[85%] rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs leading-relaxed shadow-2xs ${isUser
                         ? "bg-slate-900 text-white rounded-tr-xs"
                         : msg.conflictDetected
-                        ? "bg-amber-50/90 text-slate-800 border border-amber-200 rounded-tl-xs"
-                        : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
-                    }`}
+                          ? "bg-amber-50/90 text-slate-800 border border-amber-200 rounded-tl-xs"
+                          : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
+                      }`}
                   >
                     {!isUser && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-1.5 mb-2 gap-1.5">
@@ -2929,18 +2932,17 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
         </div>
 
         {/* Kolom Kanan: Pratinjau Dokumen dengan Coretan Background / Form Editor Perbaikan / Simpan Hasil */}
-        <div className="lg:col-span-6 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[540px] sm:h-[620px] lg:h-[720px]">
+        <div className="lg:col-span-7 xl:col-span-7 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[620px] sm:h-[700px] lg:h-[780px]">
           {/* Tab Navigation Kolom Kanan - Responsive Scroll/Wrap */}
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-3 sm:px-4 py-2 sm:py-2.5 gap-2">
             <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-thin max-w-full pb-0.5">
               <button
                 type="button"
                 onClick={() => setActiveRightTab("preview")}
-                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                  activeRightTab === "preview"
+                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${activeRightTab === "preview"
                     ? "bg-white text-blue-700 shadow-xs border border-slate-200"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <FileText size={13} className="text-blue-600 sm:w-[14px] sm:h-[14px]" />
                 <span className="whitespace-nowrap">Pratinjau Lembar Draf</span>
@@ -2954,11 +2956,10 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
               <button
                 type="button"
                 onClick={() => setActiveRightTab("editor")}
-                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                  activeRightTab === "editor"
+                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${activeRightTab === "editor"
                     ? "bg-white text-emerald-700 shadow-xs border border-slate-200"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <Edit3 size={13} className="text-emerald-600 sm:w-[14px] sm:h-[14px]" />
                 <span className="whitespace-nowrap">Editor Perbaikan Draf</span>
@@ -2967,11 +2968,10 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
               <button
                 type="button"
                 onClick={() => setActiveRightTab("form")}
-                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                  activeRightTab === "form"
+                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${activeRightTab === "form"
                     ? "bg-white text-slate-800 shadow-xs border border-slate-200"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <CheckCircle2 size={13} className="text-slate-600 sm:w-[14px] sm:h-[14px]" />
                 <span className="whitespace-nowrap">Form Hasil</span>
@@ -3017,11 +3017,10 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
                         <div
                           key={cf.id}
                           onClick={() => setSelectedConflict(cf)}
-                          className={`p-2 sm:p-2.5 rounded-lg border text-xs cursor-pointer transition ${
-                            selectedConflict?.id === cf.id
+                          className={`p-2 sm:p-2.5 rounded-lg border text-xs cursor-pointer transition ${selectedConflict?.id === cf.id
                               ? "border-rose-400 bg-rose-100/90 shadow-2xs"
                               : "border-rose-200 bg-white/80 hover:bg-rose-100/60"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-extrabold text-rose-900 line-through decoration-rose-500 decoration-2">
@@ -3053,126 +3052,137 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
                   </div>
                 )}
 
-                {/* Lembar Dokumen Simulasi A4 Visual dengan Coretan Background */}
-                <div className="relative mx-auto w-full max-w-full sm:max-w-[500px] rounded-xl border border-slate-300 bg-white p-4 sm:p-7 shadow-md font-serif text-[10.5px] sm:text-[11px] leading-relaxed text-slate-800 box-border overflow-x-hidden">
-                  <div className="text-center font-bold space-y-0.5 border-b border-slate-200 pb-3 mb-4">
-                    <p className="text-[9.5px] sm:text-[10px] tracking-wider text-slate-500">REPUBLIK INDONESIA</p>
-                    <p className="text-[11px] sm:text-xs uppercase text-slate-900">{draft.kategori || "PERATURAN BADAN INTELIJEN NEGARA"}</p>
-                    <p className="text-[9.5px] sm:text-[10px] text-slate-700">NOMOR {draft.nomor_rancangan || "Draft"} TAHUN {draft.tahun || new Date().getFullYear()}</p>
-                    <p className="text-[9.5px] sm:text-[10px] text-slate-500">TENTANG</p>
-                    <p className="text-[11px] sm:text-xs uppercase text-slate-900">{draft.judul}</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p>
-                      <strong>Menimbang:</strong> bahwa untuk menjamin kepastian hukum dan tata kelola regulasi yang selaras dengan peraturan perundang-undangan nasional...
-                    </p>
-                    <p>
-                      <strong>Mengingat:</strong> 1. Undang-Undang Nomor 17 Tahun 2011 tentang Intelijen Negara; 2. Peraturan Presiden Nomor 90 Tahun 2012...
-                    </p>
-                    <p className="text-center font-bold my-2">MEMUTUSKAN:</p>
-
-                    {/* Pasal 1 */}
-                    <div className="p-2 rounded-md">
-                      <p className="font-bold text-center">BAB I KETENTUAN UMUM</p>
-                      <p className="font-bold text-center mt-1">Pasal 1</p>
-                      <p className="mt-1">Dalam Peraturan ini yang dimaksud dengan: Ketentuan teknis operasional...</p>
+                {/* Berkas Dokumen Draft Rancangan (Sesuai Foto Kedua) */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 font-bold text-xs shrink-0">
+                      03
                     </div>
-
-                    {/* Pasal 2 dengan Coretan Background Merah/Amber jika ada benturan */}
-                    <div
-                      className={`p-2 sm:p-2.5 rounded-lg border transition ${
-                        conflictFindings.length > 0
-                          ? "border-rose-300 bg-rose-50/90 shadow-2xs"
-                          : "border-slate-100 bg-slate-50/30"
-                      }`}
-                    >
-                      <p className="font-bold text-center">BAB II RUANG LINGKUP DAN PENYELARASAN WEWENANG</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-1 gap-1">
-                        <p className={`font-bold ${conflictFindings.length > 0 ? "text-rose-900 line-through decoration-rose-500" : ""}`}>
-                          Pasal 2
-                        </p>
-                        {conflictFindings.length > 0 && (
-                          <span className="text-[9px] font-bold text-rose-700 bg-rose-200/90 px-1.5 py-0.5 rounded self-start sm:self-auto">
-                            ⚠️ Coretan: Tumpang Tindih Perpres 90/2012
-                          </span>
-                        )}
-                      </div>
-                      <p className={`mt-1 ${conflictFindings.length > 0 ? "bg-rose-200/60 p-1.5 rounded text-rose-950 font-medium" : ""}`}>
-                        (1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, dan akuntabilitas.
-                        <br />
-                        (2) Penyelenggaraan wewenang teknis diselenggarakan dengan memperhatikan keselarasan terhadap peraturan perundang-undangan yang lebih tinggi.
-                      </p>
-                    </div>
-
-                    {/* Pasal 3 Ketentuan Penutup */}
-                    <div
-                      className={`p-2 sm:p-2.5 rounded-lg border transition ${
-                        conflictFindings.length > 0
-                          ? "border-amber-300 bg-amber-50/80"
-                          : "border-slate-100 bg-slate-50/30"
-                      }`}
-                    >
-                      <p className="font-bold text-center">BAB III KETENTUAN PENUTUP</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-1 gap-1">
-                        <p className={`font-bold ${conflictFindings.length > 0 ? "text-amber-900" : ""}`}>
-                          Pasal 3
-                        </p>
-                        {conflictFindings.length > 0 && (
-                          <span className="text-[9px] font-bold text-amber-800 bg-amber-200/90 px-1.5 py-0.5 rounded self-start sm:self-auto">
-                            ⚠️ Warning: Perlu Penegasan Hierarki
-                          </span>
-                        )}
-                      </div>
-                      <p className={`mt-1 ${conflictFindings.length > 0 ? "bg-amber-100/70 p-1.5 rounded text-amber-950 font-medium" : ""}`}>
-                        Peraturan ini mulai berlaku pada tanggal diundangkan.
-                      </p>
+                    <div>
+                      <h5 className="font-bold text-sm text-slate-900">Berkas Dokumen</h5>
+                      <p className="text-xs text-slate-500">Dokumen draft dan naskah akademik yang diunggah</p>
                     </div>
                   </div>
 
-                  {/* Tombol Aksi Cepat pada Lembar Pratinjau */}
-                  <div className="mt-5 pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <span className="text-[10px] text-slate-400">Pratinjau Draf Regulasi JDIH</span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveRightTab("editor")}
-                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer self-start sm:self-auto"
-                    >
-                      <Edit3 size={12} />
-                      <span>Edit & Perbaiki Draf Ini</span>
-                    </button>
+                  <div className="mt-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/40 p-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100/70 text-blue-600 shadow-2xs">
+                        <FileText size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800">File Draft Rancangan</p>
+                        <p className="text-[11px] text-slate-500 truncate max-w-[240px] sm:max-w-[320px]">
+                          {draft.file_draft || "Belum ada file draft terunggah"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {draft.file_draft ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const url = `${backendUrl}/uploads/pengajuan-peraturan/${draft.file_draft}`;
+                              window.open(url, "_blank");
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                          >
+                            <Eye size={13} />
+                            <span>Preview</span>
+                          </button>
+                          <a
+                            href={`${backendUrl}/api/master-data/pengajuan-peraturan/${draft.id}/download-file/draft`}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
+                          >
+                            <Download size={13} />
+                            <span>Download</span>
+                          </a>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleDownloadPdfResmi}
+                          disabled={!pdfPreviewUrl}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          <Download size={13} />
+                          <span>Unduh PDF Draf</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pratinjau PDF Standar (PDF Viewer Umum dengan iframe/embed) */}
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-2.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                      <FileText size={15} className="text-blue-600" />
+                      <span>Viewer Dokumen PDF Resmi (Standar Dokumen Hukum)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveRightTab("editor")}
+                        className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
+                      >
+                        <Edit3 size={12} />
+                        <span>Edit di CKEditor</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadPdfResmi}
+                        disabled={isGeneratingPdf || !pdfPreviewUrl}
+                        className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-rose-700 transition cursor-pointer disabled:opacity-50"
+                      >
+                        <Download size={12} />
+                        <span>Unduh PDF</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="w-full bg-slate-100 min-h-[460px] sm:min-h-[520px] flex items-center justify-center p-1 sm:p-2">
+                    {pdfPreviewUrl ? (
+                      <iframe
+                        src={`${pdfPreviewUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                        title="Pratinjau PDF Regulasi"
+                        className="w-full h-[500px] sm:h-[580px] rounded-lg border border-slate-200 shadow-inner bg-white"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400 gap-2 py-12">
+                        <FileText size={32} className="animate-pulse text-slate-300" />
+                        <p className="text-xs font-medium">Sedang menyiapkan viewer PDF...</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Tab Editor Perbaikan Manual */}
+            {/* Tab Editor Perbaikan Manual dengan CKEditor Lengkap */}
             {activeRightTab === "editor" && (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 sm:p-3.5 text-xs text-blue-900 space-y-1">
+              <div className="space-y-4 flex flex-col h-full">
+                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 sm:p-3.5 text-xs text-blue-900 space-y-1 shrink-0">
                   <div className="font-bold flex items-center gap-1.5">
                     <Edit3 size={14} className="text-blue-600" />
-                    <span>Editor Perbaikan Draf Regulasi</span>
+                    <span>Editor Perbaikan Draf Regulasi (CKEditor Lengkap)</span>
                   </div>
                   <p className="text-[11px] text-blue-800 leading-relaxed">
-                    Anda dapat merevisi pasal dan klausul yang bermasalah secara langsung di bawah ini. Setelah selesai, klik tombol <strong>"Simpan & Generate Ulang PDF"</strong> untuk memperbarui dokumen resmi.
+                    Perbaiki pasal, ayat, atau tabel draf regulasi menggunakan editor WYSIWYG lengkap di bawah ini. Setelah selesai, klik tombol <strong>"Simpan & Generate Ulang PDF"</strong> untuk memperbarui pratinjau PDF standar.
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Isi Batang Tubuh Peraturan (BAB & Pasal)
-                  </label>
-                  <textarea
-                    rows={15}
+                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs flex-1 min-h-[460px] sm:min-h-[520px]">
+                  <FormCKEditorClient
                     value={drafBatangTubuh}
-                    onChange={(e) => setDrafBatangTubuh(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 p-3 sm:p-3.5 text-xs font-mono leading-relaxed focus:border-blue-500 focus:outline-none bg-white custom-scrollbar shadow-inner"
-                    placeholder="Tuliskan BAB dan Pasal..."
+                    onChange={(val) => setDrafBatangTubuh(val)}
+                    placeholder="Tuliskan draf peraturan perundang-undangan..."
+                    minHeight={460}
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 shrink-0">
                   <button
                     type="button"
                     onClick={handlePerbaikiOtomatis}
@@ -3270,32 +3280,11 @@ Peraturan ini mulai berlaku pada tanggal diundangkan.`;
                     <div className="flex justify-end pt-2">
                       <button
                         type="submit"
-                        disabled={isSubmitting}
+                        disabled={isPending}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer disabled:opacity-50"
                       >
                         <CheckCircle2 size={15} />
-                        <span>{isSubmitting ? "Menyimpan..." : "Simpan Keputusan Harmonisasi"}</span>
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-                      />
-                    </div>
-
-                    <div className="flex justify-end pt-2 border-t border-slate-100">
-                      <button
-                        type="submit"
-                        disabled={isPending}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition disabled:opacity-50 cursor-pointer"
-                      >
-                        <CheckCircle2 size={15} />
-                        {isPending ? "Menyimpan..." : "Simpan Hasil Harmonisasi"}
+                        <span>{isPending ? "Menyimpan..." : "Simpan Keputusan Harmonisasi"}</span>
                       </button>
                     </div>
                   </form>
@@ -3460,13 +3449,12 @@ function TabPersetujuan({
                   <td className="px-4 py-3 text-slate-600">{item.jabatan}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                        item.status === "Disetujui"
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${item.status === "Disetujui"
                           ? "bg-emerald-100 text-emerald-700"
                           : item.status === "Ditolak"
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
                     >
                       {item.status}
                     </span>

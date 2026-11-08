@@ -131,7 +131,25 @@ export async function generatePeraturanPdfBlob({
     batangTubuh ||
     `BAB I\nKETENTUAN UMUM\n\nPasal 1\nDalam Peraturan ini yang dimaksud dengan:\n1. Intelijen Negara adalah penyelenggara intelijen yang merupakan bagian integral dari sistem keamanan nasional.\n2. Badan Intelijen Negara yang selanjutnya disingkat BIN adalah lini terdepan intelijen nasional.\n\nBAB II\nRUANG LINGKUP DAN PELAKSANAAN\n\nPasal 2\n(1) Pelaksanaan kegiatan berpedoman pada prinsip legalitas, profesionalitas, dan akuntabilitas.\n(2) Ketentuan teknis diselenggarakan dengan memperhatikan keselarasan terhadap peraturan perundang-undangan yang lebih tinggi.\n\nBAB III\nKETENTUAN PENUTUP\n\nPasal 3\nPeraturan ini tidak mengurangi kewenangan koordinasi intelijen nasional sebagaimana ditetapkan dalam peraturan yang berlaku.\n\nPasal 4\nPeraturan ini mulai berlaku pada tanggal diundangkan.`;
 
-  const paragraphs = defaultBatangTubuh.split("\n");
+  // Bersihkan format HTML jika input berasal dari CKEditor
+  const cleanHtmlToText = (raw: string) => {
+    return raw
+      .replace(/<br\s*[\/]?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<\/h[1-6]>/gi, "\n\n")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "• ")
+      .replace(/<[^>]+>/gi, "")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/\n{3,}/g, "\n\n");
+  };
+
+  const plainTextBody = cleanHtmlToText(defaultBatangTubuh);
+  const paragraphs = plainTextBody.split("\n");
   for (const p of paragraphs) {
     const trimmed = p.trim();
     if (!trimmed) {

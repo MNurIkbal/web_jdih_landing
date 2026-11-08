@@ -24,7 +24,6 @@ export const useDokumenHukumList = (params: any) => {
   return useQuery({
     queryKey: ["DokumenHukum", params],
     queryFn: () => fetchDokumenHukum(params),
-
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     staleTime: 0,
@@ -34,22 +33,17 @@ export const useDokumenHukumList = (params: any) => {
 export const useDokumenHukumDetail = (id: number) => {
   return useQuery({
     queryKey: ["DokumenHukum", id],
-
     queryFn: () => fetchByIdDokumenHukum(id),
-
     enabled: !!id,
   });
 };
 
 export const useCreateDokumenHukum = () => {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: createDokumenHukum,
-
     onSuccess: () => {
       toast.success("Berhasil tambah data");
-
       qc.invalidateQueries({
         queryKey: ["DokumenHukum"],
       });

@@ -47,8 +47,8 @@ export const useCreatePengguna = () => {
   return useMutation({
     mutationFn: createPengguna,
 
-    onSuccess: () => {
-      toast.success("Berhasil tambah data");
+    onSuccess: (data: any) => {
+      toast.success(data?.message || "Berhasil tambah data");
 
       qc.invalidateQueries({
         queryKey: ["Pengguna"],
@@ -67,8 +67,8 @@ export const useUpdatePengguna = () => {
   return useMutation({
     mutationFn: ({ id, data }: any) => useupdatePengguna(id, data),
 
-    onSuccess: () => {
-      toast.success("Berhasil update data");
+    onSuccess: (data: any) => {
+      toast.success(data?.message || "Berhasil update data");
 
       qc.invalidateQueries({
         queryKey: ["Pengguna"],

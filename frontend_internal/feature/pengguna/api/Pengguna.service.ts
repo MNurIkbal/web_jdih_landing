@@ -18,17 +18,17 @@ export const fetchByIdPengguna = async (id: number): Promise<Pengguna> => {
 
 export const createPengguna = async (
   data: PenggunaRequest,
-): Promise<PenggunaRequest> => {
+): Promise<any> => {
   const res = await api.post("/user", data);
-  return res.data.data;
+  return res.data;
 };
 
 export const useupdatePengguna = async (
   id: number,
   data: PenggunaRequest,
-): Promise<PenggunaRequest> => {
+): Promise<any> => {
   const res = await api.put(`/user/${id}`, data);
-  return res.data.data;
+  return res.data;
 };
 
 export const deletePengguna = async (id: number): Promise<void> => {

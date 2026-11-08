@@ -126,7 +126,7 @@ export default function AdminSidebar({
                 type="button"
                 onClick={() => setActiveModule("JDIH")}
                 disabled={isSwitchingModule}
-                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all duration-200 ${
+                className={`flex items-center cursor-pointer justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all duration-200 ${
                   activeModule === "JDIH"
                     ? "text-white"
                     : "text-slate-300 hover:text-white"
@@ -145,7 +145,7 @@ export default function AdminSidebar({
                 type="button"
                 onClick={() => setActiveModule("HDH")}
                 disabled={isSwitchingModule}
-                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all duration-200 ${
+                className={`flex items-center  cursor-pointer  justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all duration-200 ${
                   activeModule === "HDH"
                     ? "text-white"
                     : "text-slate-300 hover:text-white"

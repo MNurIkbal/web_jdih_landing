@@ -105,7 +105,12 @@ const create = async (req, res) => {
         });
 
     } catch (error) {
-        
+        if (error.code === "23505") {
+            return res.status(400).json({
+                success: false,
+                message: "Email sudah terdaftar. Silakan gunakan email lain.",
+            });
+        }
 
         return res.status(400).json({
             success: false,
@@ -162,7 +167,12 @@ const update = async (req, res) => {
         });
 
     } catch (error) {
-        
+        if (error.code === "23505") {
+            return res.status(400).json({
+                success: false,
+                message: "Email sudah terdaftar. Silakan gunakan email lain.",
+            });
+        }
 
         return res.status(400).json({
             success: false,

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
+import { Toaster } from "sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className="antialiased flex min-h-screen flex-col">
         <QueryProvider>
           <div className="flex-1">{children}</div>
+          <Toaster position="top-right" richColors closeButton duration={2000} />
         </QueryProvider>
       </body>
     </html>

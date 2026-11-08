@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export type AdminMenuMode = "sidebar" | "navbar";
 export type AdminActiveModule = "JDIH" | "HDH";
@@ -20,6 +21,7 @@ interface AdminLayoutContextType {
 const AdminLayoutContext = createContext<AdminLayoutContextType | undefined>(undefined);
 
 export function AdminLayoutProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [menuMode, setMenuModeState] = useState<AdminMenuMode>("sidebar");
   const [activeModule, setActiveModuleState] = useState<AdminActiveModule>("JDIH");
   const [isSwitchingModule, setIsSwitchingModule] = useState(false);
@@ -54,6 +56,9 @@ export function AdminLayoutProvider({ children }: { children: React.ReactNode })
     // Mulai proses animasi transisi pergantian modul
     setIsSwitchingModule(true);
     setSwitchingTarget(mod);
+
+    // Otomatis arahkan ke dashboard modul tujuan saat pergantian modul
+    router.replace("/admin/dashboard");
 
     // Setelah proses animasi singkat (fade-in & scanner), terapkan modul baru
     setTimeout(() => {

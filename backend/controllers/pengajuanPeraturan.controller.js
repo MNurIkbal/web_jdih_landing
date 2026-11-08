@@ -23,9 +23,21 @@ const getOptions = async (req, res) => {
 
 const getAll = async (req, res) => {
     try {
+        let userRole = "";
+        try {
+            const token = req.cookies?.access_token || req.headers?.authorization?.replace("Bearer ", "");
+            if (token) {
+                const decoded = jwt.decode(token);
+                userRole = (decoded?.role || "").toLowerCase();
+            }
+        } catch (e) {
+            // Abaikan jika token gagal decode
+        }
+
         const result = await pengajuanService.getAll({
             search: req.query.search || "",
             tahapan: req.query.tahapan || "",
+            role: userRole,
             page: parseInt(req.query.page, 10) || 1,
             size: parseInt(req.query.size, 10) || 10,
         });
@@ -86,6 +98,9 @@ const create = async (req, res) => {
             tipe_dokumen,
             status_dokumen,
             tempat_penetapan,
+            tanggal_penetapan,
+            tanggal_pengundangan,
+            tanggal_berlaku,
             subject,
             sumber,
             urgensi,
@@ -110,6 +125,9 @@ const create = async (req, res) => {
             tipe_dokumen,
             status_dokumen,
             tempat_penetapan,
+            tanggal_penetapan,
+            tanggal_pengundangan,
+            tanggal_berlaku,
             subject,
             sumber,
             urgensi,
@@ -118,8 +136,8 @@ const create = async (req, res) => {
             tahun,
             pemrakarsa,
             penanggung_jawab,
-            tanggal_pengajuan,
-            target_penetapan,
+            tanggal_pengajuan: tanggal_pengajuan || tanggal_pengundangan || null,
+            target_penetapan: target_penetapan || tanggal_berlaku || tanggal_penetapan || null,
             ringkasan,
             catatan_revisi,
             file_draft: fileDraft,
@@ -153,6 +171,9 @@ const update = async (req, res) => {
             tipe_dokumen,
             status_dokumen,
             tempat_penetapan,
+            tanggal_penetapan,
+            tanggal_pengundangan,
+            tanggal_berlaku,
             subject,
             sumber,
             urgensi,
@@ -178,6 +199,9 @@ const update = async (req, res) => {
             tipe_dokumen,
             status_dokumen,
             tempat_penetapan,
+            tanggal_penetapan,
+            tanggal_pengundangan,
+            tanggal_berlaku,
             subject,
             sumber,
             urgensi,
@@ -186,8 +210,8 @@ const update = async (req, res) => {
             tahun,
             pemrakarsa,
             penanggung_jawab,
-            tanggal_pengajuan,
-            target_penetapan,
+            tanggal_pengajuan: tanggal_pengajuan || tanggal_pengundangan || null,
+            target_penetapan: target_penetapan || tanggal_berlaku || tanggal_penetapan || null,
             ringkasan,
             status,
             tahapan,

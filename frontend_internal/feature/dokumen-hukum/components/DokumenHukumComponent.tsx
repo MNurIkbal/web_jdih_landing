@@ -34,6 +34,7 @@ import DataTable, {
 import Toast from "@/components/ui/Toast";
 import { DokumenHukum } from "../types/DokumenHukum.type";
 import { useDokumenHukumList } from "../hooks/DokumenHukum.hooks";
+import { SessionHook } from "@/feature/web";
 
 /**
  * ============================================================
@@ -148,6 +149,9 @@ function DokumenHukumContent() {
 
   const [openDropdownId, setOpenDropdownId] = useState<number | string | null>(null);
   const [detailModalData, setDetailModalData] = useState<DokumenHukum | null>(null);
+
+  const session = SessionHook();
+  const userRole = (session?.data?.data?.role || "superadmin").toLowerCase();
 
   /**
    * ============================================================
@@ -317,8 +321,9 @@ function DokumenHukumContent() {
         key: "judul",
         label: "Dokumen Hukum Terpublikasi",
         sortable: true,
+        width: "360px",
         render: (_val, row) => (
-          <div className="py-1">
+          <div className="py-1 max-w-[360px]">
             <div className="font-bold text-slate-900 line-clamp-2 hover:text-blue-700 transition">
               {row.judul}
             </div>

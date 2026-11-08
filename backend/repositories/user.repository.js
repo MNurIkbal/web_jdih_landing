@@ -133,7 +133,7 @@ const findByEmail = async (email) => {
             created_at,
             updated_at
         FROM users
-        WHERE email = $1
+        WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
           AND deleted_at IS NULL
         LIMIT 1
     `;

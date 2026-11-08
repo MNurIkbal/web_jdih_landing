@@ -11,6 +11,10 @@ export type StatusPeraturan =
   | "Review"
   | "Pengajuan Ulang"
   | "Proses"
+  | "Pembahasan"
+  | "Harmonisasi"
+  | "Persetujuan"
+  | "Penetapan"
   | "Revisi"
   | "Disetujui"
   | "Ditolak"
@@ -53,6 +57,9 @@ export interface PengajuanPeraturan {
   status: StatusPeraturan;
   tanggal_pengajuan?: string;
   target_penetapan?: string;
+  tanggal_penetapan?: string;
+  tanggal_pengundangan?: string;
+  tanggal_berlaku?: string;
   ringkasan?: string;
   catatan_revisi?: string;
   file_draft?: string;
@@ -83,6 +90,9 @@ export interface PengajuanPeraturanRequest {
   penanggung_jawab?: string;
   tanggal_pengajuan?: string;
   target_penetapan?: string;
+  tanggal_penetapan?: string;
+  tanggal_pengundangan?: string;
+  tanggal_berlaku?: string;
   ringkasan?: string;
   catatan_revisi?: string;
   file_draft?: File | null;

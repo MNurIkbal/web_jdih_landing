@@ -27,7 +27,6 @@ interface AdminNavbarProps {
 
 export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { menuMode, setMenuMode, activeModule, setActiveModule, isSwitchingModule, switchingTarget } = useAdminLayout();
   const logoutMutation = LogoutHook();
   const sessionHooks = SessionHook();
@@ -43,8 +42,10 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
+  
   const nama = sessionHooks ? (sessionHooks.data?.data?.nama ?? "Admin") : "";
+  const role = sessionHooks ? (sessionHooks.data?.data?.role ?? "") : "";
+  const foto = sessionHooks ? (sessionHooks.data?.data?.foto ?? "") : "";
   const id_data = sessionHooks ? (sessionHooks.data?.data?.id ?? "Administrator") : "";
 
   const handleLogout = async () => {
@@ -199,7 +200,7 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
               <button
                 type="button"
                 onClick={() => setMenuMode("sidebar")}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                className={`flex  cursor-pointer  items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
                   menuMode === "sidebar"
                     ? "bg-white text-blue-700 shadow-sm"
                     : "text-slate-500 hover:text-slate-900"
@@ -212,7 +213,7 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
               <button
                 type="button"
                 onClick={() => setMenuMode("navbar")}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                className={`flex  cursor-pointer  items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
                   menuMode === "navbar"
                     ? "bg-white text-blue-700 shadow-sm"
                     : "text-slate-500 hover:text-slate-900"
@@ -233,21 +234,38 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
                 onClick={() => setProfileOpen((value) => !value)}
                 className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 transition hover:bg-slate-50 border border-slate-200/70"
               >
-                <div
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
-                  style={{
-                    background: "linear-gradient(135deg, #0D3B73 0%, #1358A8 100%)",
-                  }}
-                >
-                  <User size={16} />
-                </div>
+                {foto ? (
+                  <div className="relative h-9 w-9 overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-slate-100">
+                    <img
+                      src={
+                        foto.startsWith("http")
+                          ? foto
+                          : `${process.env.NEXT_PUBLIC_APP_BACKEND_URL || "http://localhost:8080"}/uploads/users/${foto}`
+                      }
+                      alt={nama}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
+                    style={{
+                      background: "linear-gradient(135deg, #0D3B73 0%, #1358A8 100%)",
+                    }}
+                  >
+                    <User size={16} />
+                  </div>
+                )}
 
                 <div className="hidden text-left md:block">
                   <div className="text-[13px] font-semibold text-slate-800">
                     {nama}
                   </div>
-                  <div className="text-[10.5px] text-slate-400">
-                    Administrator
+                  <div className="text-[10.5px] font-medium capitalize text-slate-400">
+                    {role || "Administrator"}
                   </div>
                 </div>
               </button>
@@ -259,9 +277,35 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
                     className="fixed inset-0 z-40"
                   />
                   <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-top-2">
-                    <div className="border-b border-slate-100 px-3 py-2.5">
-                      <p className="text-xs font-bold text-slate-800">{nama}</p>
-                      <p className="text-[11px] text-slate-400">Sistem JDIH BIN</p>
+                    <div className="border-b border-slate-100 px-3 py-2.5 flex items-center gap-2.5">
+                      {foto ? (
+                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-slate-200 shadow-xs bg-slate-100">
+                          <img
+                            src={
+                              foto.startsWith("http")
+                                ? foto
+                                : `${process.env.NEXT_PUBLIC_APP_BACKEND_URL || "http://localhost:8080"}/uploads/users/${foto}`
+                            }
+                            alt={nama}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-xs"
+                          style={{
+                            background: "linear-gradient(135deg, #0D3B73 0%, #1358A8 100%)",
+                          }}
+                        >
+                          <User size={18} />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-slate-800">{nama}</p>
+                        <p className="truncate text-[11px] font-semibold capitalize text-blue-600">
+                          {role || "Administrator"}
+                        </p>
+                      </div>
                     </div>
 
                     {/* Mobile Switch Layout Mode inside dropdown */}

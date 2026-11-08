@@ -32,14 +32,14 @@ export const JDIH_MENU_ITEMS: AdminMenuItem[] = [
     href: "/admin/dashboard",
     icon: LayoutDashboard,
     module: "JDIH",
-    roles: ["superadmin", "admin"],
+    roles: ["superadmin", "admin", "pengguna"],
   },
   {
     label: "Pengajuan Peraturan",
     href: "/admin/pengajuan-peraturan",
     icon: FileSpreadsheet,
     module: "JDIH",
-    roles: ["superadmin", "admin", "pengguna"],
+    roles: ["admin", "pengguna"],
   },
   {
     label: "Monitoring Progres",
@@ -109,6 +109,13 @@ export const JDIH_MENU_ITEMS: AdminMenuItem[] = [
 // Menu Navigasi Modul HDH (Harmonisasi Dokumen Hukum)
 export const HDH_MENU_ITEMS: AdminMenuItem[] = [
   {
+    label: "Dashboard",
+    href: "/admin/dashboard",
+    icon: LayoutDashboard,
+    module: "HDH",
+    roles: ["superadmin", "admin", "pengguna"],
+  },
+  {
     label: "Harmonisasi Peraturan",
     href: "/admin/pengajuan-peraturan",
     icon: Scale,
@@ -124,7 +131,6 @@ export const filterMenuItemsByRole = (
   const normalizedRole = (role || "pengguna").toLowerCase() as "superadmin" | "admin" | "pengguna";
   return items.filter((item) => {
     if (!item.roles || item.roles.length === 0) return true;
-    if (normalizedRole === "superadmin") return true;
     return item.roles.includes(normalizedRole);
   });
 };

@@ -30,13 +30,28 @@ function AdminLayoutInner({ children }: AdminLayoutWrapperProps) {
     }
   }, [isUnauthenticated, router]);
 
-  // 2. Role Protection:
+  // 2. Role & Module Protection:
   // - /admin/pengguna & /admin/pengaturan HANYA boleh diakses oleh superadmin
-  // - Admin (verifikator) dan Pengguna tidak boleh akses
+  // - /admin/pengajuan-peraturan TIDAK BOLEH diakses oleh superadmin (hanya admin dan pengguna)
+  // - Modul HDH HANYA memiliki menu: /admin/dashboard dan /admin/pengajuan-peraturan.
+  //   Jika user sedang berada di modul HDH dan mencoba membuka rute modul JDIH (seperti /admin/berita, /admin/slider, /admin/dokumen-hukum, dll),
+  //   otomatis kembalikan ke /admin/dashboard.
   const isSuperadminOnlyRoute =
     pathname.startsWith("/admin/pengguna") || pathname.startsWith("/admin/pengaturan");
+  const isPengajuanPeraturanRoute = pathname.startsWith("/admin/pengajuan-peraturan");
+
+  const isHdhRestrictedRoute =
+    activeModule === "HDH" &&
+    pathname.startsWith("/admin/") &&
+    !pathname.startsWith("/admin/dashboard") &&
+    !pathname.startsWith("/admin/pengajuan-peraturan");
+
   const isForbiddenForCurrentRole =
-    !session.isLoading && userRole && userRole !== "superadmin" && isSuperadminOnlyRoute;
+    !session.isLoading &&
+    (isHdhRestrictedRoute ||
+      (userRole &&
+        ((userRole !== "superadmin" && isSuperadminOnlyRoute) ||
+          (userRole === "superadmin" && isPengajuanPeraturanRoute))));
 
   useEffect(() => {
     if (isForbiddenForCurrentRole) {

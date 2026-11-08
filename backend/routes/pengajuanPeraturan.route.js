@@ -9,10 +9,10 @@ router.get("/", pengajuanController.getAll);
 router.get("/:id", pengajuanController.getById);
 router.get("/:id/download-file/:type", pengajuanController.downloadFilePengajuan);
 
-// Tahap 1: Pengajuan Baru (Admin dilarang create, hanya pengguna & superadmin)
+// Tahap 1: Pengajuan Baru (Khusus role pengguna saja)
 router.post(
     "/",
-    requireRole("superadmin", "pengguna"),
+    requireRole("pengguna"),
     upload.fields([
         { name: "file_draft", maxCount: 1 },
         { name: "file_dokumen", maxCount: 1 },
@@ -22,10 +22,10 @@ router.post(
     pengajuanController.create
 );
 
-// Update Pengajuan Peraturan (Admin dilarang update, hanya pengguna & superadmin)
+// Update Pengajuan Peraturan (Khusus role pengguna saja)
 router.put(
     "/:id",
-    requireRole("superadmin", "pengguna"),
+    requireRole("pengguna"),
     upload.fields([
         { name: "file_draft", maxCount: 1 },
         { name: "file_dokumen", maxCount: 1 },
@@ -38,17 +38,19 @@ router.put(
 // Update tahapan langsung jika dibutuhkan
 router.put("/:id/tahapan", pengajuanController.updateTahapan);
 
-// Tahap 2: Pembahasan (upload hasil rapat)
+// Tahap 2: Pembahasan (upload hasil rapat - Dibatasi hanya untuk pengguna/pemohon)
 router.post(
     "/:id/pembahasan",
+    requireRole("pengguna"),
     upload.single("file_notulensi"),
     pengajuanController.addPembahasan
 );
-router.delete("/pembahasan/:pembahasanId", pengajuanController.deletePembahasan);
+router.delete("/pembahasan/:pembahasanId", requireRole("pengguna"), pengajuanController.deletePembahasan);
 
-// Tahap 3: Harmonisasi
+// Tahap 3: Harmonisasi (Khusus pengguna/pemohon)
 router.post(
     "/:id/harmonisasi",
+    requireRole("pengguna"),
     upload.single("file_harmonisasi"),
     pengajuanController.submitHarmonisasi
 );
@@ -65,8 +67,8 @@ router.post(
     pengajuanController.tetapkanDanPublikasikan
 );
 
-// Soft delete (Admin dilarang delete, hanya pengguna & superadmin)
-router.delete("/:id", requireRole("superadmin", "pengguna"), pengajuanController.remove);
+// Soft delete (Khusus role pengguna saja)
+router.delete("/:id", requireRole("pengguna"), pengajuanController.remove);
 
 module.exports = router;
 

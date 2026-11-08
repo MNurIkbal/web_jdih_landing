@@ -10,6 +10,9 @@ const ensureDraftColumns = async () => {
             ADD COLUMN IF NOT EXISTS tipe_dokumen VARCHAR(255),
             ADD COLUMN IF NOT EXISTS status_dokumen VARCHAR(100) DEFAULT 'Berlaku',
             ADD COLUMN IF NOT EXISTS tempat_penetapan VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS tanggal_penetapan DATE,
+            ADD COLUMN IF NOT EXISTS tanggal_pengundangan DATE,
+            ADD COLUMN IF NOT EXISTS tanggal_berlaku DATE,
             ADD COLUMN IF NOT EXISTS subjek VARCHAR(255),
             ADD COLUMN IF NOT EXISTS subject VARCHAR(255),
             ADD COLUMN IF NOT EXISTS sumber TEXT,
@@ -38,12 +41,17 @@ const ensureDraftColumns = async () => {
     }
 };
 
-const findAll = async ({ search = "", page = 1, size = 10, tahapan = "" }) => {
+const findAll = async ({ search = "", page = 1, size = 10, tahapan = "", role = "" }) => {
     await ensureDraftColumns();
     const offset = (page - 1) * size;
     let conditions = ["deleted_at IS NULL"];
     let values = [];
     let idx = 1;
+
+    // Jika role adalah admin / verifikator, sembunyikan status: Draft, Ditolak, Revisi, Ditetapkan, dan Selesai
+    if (role === "admin") {
+        conditions.push(`status NOT IN ('Draft', 'Ditolak', 'Revisi', 'Ditetapkan', 'Selesai')`);
+    }
 
     if (search) {
         conditions.push(`(judul ILIKE $${idx} OR nomor_rancangan ILIKE $${idx} OR pemrakarsa ILIKE $${idx})`);
@@ -109,6 +117,9 @@ const createDraft = async (data) => {
         tipe_dokumen,
         status_dokumen,
         tempat_penetapan,
+        tanggal_penetapan,
+        tanggal_pengundangan,
+        tanggal_berlaku,
         subject,
         sumber,
         urgensi,
@@ -127,16 +138,20 @@ const createDraft = async (data) => {
 
     const query = `
         INSERT INTO draft_peraturan (
-            judul, kategori, bidang, tipe_dokumen, status_dokumen, tempat_penetapan, subject, subjek, sumber, urgensi, dasar_hukum, nomor_rancangan, tahun,
+            judul, kategori, bidang, tipe_dokumen, status_dokumen, tempat_penetapan,
+            tanggal_penetapan, tanggal_pengundangan, tanggal_berlaku,
+            subject, subjek, sumber, urgensi, dasar_hukum, nomor_rancangan, tahun,
             pemrakarsa, penanggung_jawab, tahapan, status,
             tanggal_pengajuan, target_penetapan, ringkasan,
             catatan_revisi, file_draft, file_naskah_akademik,
             dilihat, download, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $7, $8, $9, $10, $11, $12,
-            $13, $14, 'Pengajuan', 'Draft',
-            $15, $16, $17,
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9,
+            $10, $10, $11, $12, $13, $14, $15,
+            $16, $17, 'Pengajuan', 'Draft',
             $18, $19, $20,
+            $21, $22, $23,
             0, 0, NOW(), NOW()
         ) RETURNING *;
     `;
@@ -148,6 +163,9 @@ const createDraft = async (data) => {
         tipe_dokumen || null,
         status_dokumen || "Berlaku",
         tempat_penetapan || null,
+        tanggal_penetapan || null,
+        tanggal_pengundangan || null,
+        tanggal_berlaku || null,
         subject || null,
         sumber || null,
         urgensi || null,
@@ -156,8 +174,8 @@ const createDraft = async (data) => {
         tahun ? parseInt(tahun, 10) : new Date().getFullYear(),
         pemrakarsa || null,
         penanggung_jawab || null,
-        tanggal_pengajuan || new Date(),
-        target_penetapan || null,
+        tanggal_pengajuan || tanggal_pengundangan || new Date(),
+        target_penetapan || tanggal_berlaku || tanggal_penetapan || null,
         ringkasan || null,
         catatan_revisi || null,
         file_draft || null,
@@ -177,6 +195,9 @@ const updateDraft = async (id, data) => {
         tipe_dokumen,
         status_dokumen,
         tempat_penetapan,
+        tanggal_penetapan,
+        tanggal_pengundangan,
+        tanggal_berlaku,
         subject,
         sumber,
         urgensi,
@@ -203,22 +224,25 @@ const updateDraft = async (id, data) => {
             tipe_dokumen = COALESCE($5, tipe_dokumen),
             status_dokumen = COALESCE($6, status_dokumen),
             tempat_penetapan = COALESCE($7, tempat_penetapan),
-            subject = COALESCE($8, subject),
-            subjek = COALESCE($8, subjek),
-            sumber = COALESCE($9, sumber),
-            urgensi = COALESCE($10, urgensi),
-            dasar_hukum = COALESCE($11, dasar_hukum),
-            nomor_rancangan = COALESCE($12, nomor_rancangan),
-            tahun = COALESCE($13, tahun),
-            pemrakarsa = COALESCE($14, pemrakarsa),
-            penanggung_jawab = COALESCE($15, penanggung_jawab),
-            tanggal_pengajuan = COALESCE($16, tanggal_pengajuan),
-            target_penetapan = COALESCE($17, target_penetapan),
-            ringkasan = COALESCE($18, ringkasan),
-            status = COALESCE($19, status),
-            tahapan = COALESCE($20, tahapan),
-            file_draft = COALESCE($21, file_draft),
-            file_naskah_akademik = COALESCE($22, file_naskah_akademik),
+            tanggal_penetapan = COALESCE($8, tanggal_penetapan),
+            tanggal_pengundangan = COALESCE($9, tanggal_pengundangan),
+            tanggal_berlaku = COALESCE($10, tanggal_berlaku),
+            subject = COALESCE($11, subject),
+            subjek = COALESCE($11, subjek),
+            sumber = COALESCE($12, sumber),
+            urgensi = COALESCE($13, urgensi),
+            dasar_hukum = COALESCE($14, dasar_hukum),
+            nomor_rancangan = COALESCE($15, nomor_rancangan),
+            tahun = COALESCE($16, tahun),
+            pemrakarsa = COALESCE($17, pemrakarsa),
+            penanggung_jawab = COALESCE($18, penanggung_jawab),
+            tanggal_pengajuan = COALESCE($19, tanggal_pengajuan),
+            target_penetapan = COALESCE($20, target_penetapan),
+            ringkasan = COALESCE($21, ringkasan),
+            status = COALESCE($22, status),
+            tahapan = COALESCE($23, tahapan),
+            file_draft = COALESCE($24, file_draft),
+            file_naskah_akademik = COALESCE($25, file_naskah_akademik),
             updated_at = NOW()
         WHERE id = $1 AND deleted_at IS NULL
         RETURNING *;
@@ -232,6 +256,9 @@ const updateDraft = async (id, data) => {
         tipe_dokumen || null,
         status_dokumen || null,
         tempat_penetapan || null,
+        tanggal_penetapan || null,
+        tanggal_pengundangan || null,
+        tanggal_berlaku || null,
         subject || null,
         sumber || null,
         urgensi || null,
@@ -240,8 +267,8 @@ const updateDraft = async (id, data) => {
         tahun ? parseInt(tahun, 10) : null,
         pemrakarsa || null,
         penanggung_jawab || null,
-        tanggal_pengajuan || null,
-        target_penetapan || null,
+        tanggal_pengajuan || tanggal_pengundangan || null,
+        target_penetapan || tanggal_berlaku || tanggal_penetapan || null,
         ringkasan || null,
         status || null,
         tahapan || null,
@@ -287,8 +314,8 @@ const addPembahasan = async (draftId, data) => {
         keterangan || null,
     ]);
 
-    // Update status tahapan jika masih Pengajuan
-    await pool.query(`UPDATE draft_peraturan SET tahapan = 'Pembahasan', updated_at = NOW() WHERE id = $1`, [draftId]);
+    // Update status tahapan jika masih Pengajuan atau Proses
+    await pool.query(`UPDATE draft_peraturan SET tahapan = 'Pembahasan', status = 'Pembahasan', updated_at = NOW() WHERE id = $1`, [draftId]);
 
     return res.rows[0];
 };
@@ -305,6 +332,7 @@ const updateHarmonisasi = async (draftId, data) => {
     const query = `
         UPDATE draft_peraturan
         SET tahapan = 'Harmonisasi',
+            status = 'Harmonisasi',
             status_harmonisasi = $2,
             catatan_harmonisasi = $3,
             file_harmonisasi = COALESCE($4, file_harmonisasi),
@@ -332,7 +360,7 @@ const addPersetujuanPejabat = async (draftId, data) => {
         RETURNING *;
     `;
     const res = await pool.query(query, [draftId, nama_pejabat, jabatan]);
-    await pool.query(`UPDATE draft_peraturan SET tahapan = 'Persetujuan', updated_at = NOW() WHERE id = $1`, [draftId]);
+    await pool.query(`UPDATE draft_peraturan SET tahapan = 'Persetujuan', status = 'Persetujuan', updated_at = NOW() WHERE id = $1`, [draftId]);
     return res.rows[0];
 };
 

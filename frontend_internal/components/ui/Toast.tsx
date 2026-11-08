@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   CheckCircle2,
   XCircle,
@@ -12,6 +13,7 @@ interface ToastProps {
   type?: "success" | "error" | "info";
   title?: string;
   message: string;
+  duration?: number;
   onClose: () => void;
 }
 
@@ -20,8 +22,19 @@ export default function Toast({
   type = "success",
   title,
   message,
+  duration = 2000,
   onClose,
 }: ToastProps) {
+  useEffect(() => {
+    if (!open) return;
+
+    const timer = setTimeout(() => {
+      onClose();
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [open, duration, onClose]);
+
   if (!open) return null;
 
   const config = {

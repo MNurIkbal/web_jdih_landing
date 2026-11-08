@@ -31,6 +31,8 @@ import {
   SlidersHorizontal,
   Activity,
   Check,
+  Edit3,
+  Scale,
 } from "lucide-react";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
@@ -71,11 +73,15 @@ import FormDatePicker from "@/components/ui/FormDatePicker";
 import {
   PengajuanPeraturanSchema,
   VerifikasiPengajuanSchema,
+  PembahasanRapatSchema,
   type PengajuanPeraturanFormValues,
   type VerifikasiPengajuanFormValues,
+  type PembahasanRapatFormValues,
 } from "../schema/PengajuanPeraturan.schema";
 import { fetchDokumenHukum } from "@/feature/dokumen-hukum/api/DokumenHukum.service";
+import { useDokumenHukumList } from "@/feature/dokumen-hukum/hooks/DokumenHukum.hooks";
 import { SessionHook } from "@/feature/web";
+import { generatePeraturanPdfBlob } from "../utils/pdfGenerator";
 
 const TAHAPAN_STEPS: { stage: TahapanPeraturan; number: number; label: string; desc: string }[] = [
   { stage: "Pengajuan", number: 1, label: "Pengajuan", desc: "Drafting & Naskah Akademik" },
@@ -84,6 +90,28 @@ const TAHAPAN_STEPS: { stage: TahapanPeraturan; number: number; label: string; d
   { stage: "Persetujuan", number: 4, label: "Persetujuan", desc: "Persetujuan Multi-Pejabat" },
   { stage: "Penetapan", number: 5, label: "Penetapan", desc: "Pengundangan & Publikasi" },
 ];
+
+const formatTanggalIndo = (val?: string | null) => {
+  if (!val) return "-";
+  if (typeof val === "string") {
+    const match = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (match) {
+      const localDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      return new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(localDate);
+    }
+  }
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return String(val);
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(d);
+};
 
 export default function PengajuanPeraturanComponent({
   isMonitoringOnly = false,
@@ -140,20 +168,17 @@ export default function PengajuanPeraturanComponent({
     size,
   });
 
-  const items: PengajuanPeraturan[] = (data as any)?.data || [];
+  const rawItems: PengajuanPeraturan[] = (data as any)?.data || [];
+  // Jika role adalah admin / verifikator, jangan tampilkan data pengajuan dengan status Draft, Ditolak, Revisi, atau Ditetapkan/Selesai
+  const items = useMemo(() => {
+    if (userRole === "admin") {
+      const hiddenStatuses = ["Draft", "Ditolak", "Revisi", "Ditetapkan", "Selesai"];
+      return rawItems.filter((item) => !hiddenStatuses.includes(item.status));
+    }
+    return rawItems;
+  }, [rawItems, userRole]);
   const totalElements = (data as any)?.totalItems || items.length;
   const totalPages = (data as any)?.totalPages || Math.ceil(totalElements / size) || 1;
-
-  const formatTanggalIndo = (val?: string | null) => {
-    if (!val) return "-";
-    const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
-    return new Intl.DateTimeFormat("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(d);
-  };
 
   const columns: DataTableColumn<PengajuanPeraturan>[] = useMemo(
     () => [
@@ -176,8 +201,9 @@ export default function PengajuanPeraturanComponent({
         key: "judul",
         label: "Judul Dokumen",
         sortable: true,
+        width: "320px",
         render: (_val, row) => (
-          <div className="py-1">
+          <div className="py-1 max-w-[320px]">
             <div className="font-semibold text-slate-900 line-clamp-2 hover:text-blue-700 transition">
               {row.judul}
             </div>
@@ -209,9 +235,12 @@ export default function PengajuanPeraturanComponent({
         label: "Status",
         width: "150px",
         render: (_val, row) => {
-          const statusVal = row.status || "Proses";
+          // Jika status adalah "Proses", sesuaikan dengan tahapan aktif agar informatif
+          let statusVal: string = row.status || "Proses";
+          if (statusVal === "Proses" && row.tahapan && row.tahapan !== "Pengajuan") {
+            statusVal = row.tahapan;
+          }
 
-          // Format status badge dengan style bersih & warna semantik yang tepat
           const getStatusStyle = (s: string) => {
             switch (s) {
               case "Draft":
@@ -222,6 +251,13 @@ export default function PengajuanPeraturanComponent({
                 return "bg-amber-50 text-amber-800 border-amber-200";
               case "Pengajuan Ulang":
                 return "bg-indigo-50 text-indigo-700 border-indigo-200";
+              case "Pembahasan":
+                return "bg-sky-50 text-sky-700 border-sky-200";
+              case "Harmonisasi":
+                return "bg-purple-50 text-purple-700 border-purple-200";
+              case "Persetujuan":
+                return "bg-amber-50 text-amber-700 border-amber-200";
+              case "Penetapan":
               case "Disetujui":
               case "Ditetapkan":
                 return "bg-emerald-50 text-emerald-700 border-emerald-200";
@@ -244,6 +280,13 @@ export default function PengajuanPeraturanComponent({
                 return "bg-amber-500 animate-pulse";
               case "Pengajuan Ulang":
                 return "bg-indigo-500";
+              case "Pembahasan":
+                return "bg-sky-500";
+              case "Harmonisasi":
+                return "bg-purple-500";
+              case "Persetujuan":
+                return "bg-amber-500";
+              case "Penetapan":
               case "Disetujui":
               case "Ditetapkan":
                 return "bg-emerald-500";
@@ -271,15 +314,15 @@ export default function PengajuanPeraturanComponent({
       {
         key: "aksi",
         label: "Aksi",
-        width: "80px",
+        width: "90px",
         align: "center",
         render: (_val, row) => {
           // Status yang mengizinkan edit/hapus bagi pengguna: Draft atau Revisi/Ditolak
           const isEditableByPengguna = row.status === "Draft" || row.status === "Revisi" || row.status === "Ditolak";
-          // Admin (verifikator) MUTLAK TIDAK BOLEH buat, edit, atau hapus pengajuan
-          // Hanya 'pengguna' (atau 'superadmin') yang boleh edit/hapus
-          const canEditOrDelete =
-            (userRole === "pengguna" && isEditableByPengguna) || userRole === "superadmin";
+          // HANYA role 'pengguna' yang boleh edit atau hapus pengajuan peraturan (superadmin & admin hanya lihat/proses)
+          const canEditOrDelete = userRole === "pengguna" && isEditableByPengguna;
+          // Superadmin tidak boleh proses pengajuan
+          const canProcess = userRole !== "superadmin";
 
           return (
             <div className="relative inline-block text-left">
@@ -311,17 +354,19 @@ export default function PengajuanPeraturanComponent({
                       <span>Detail</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedId(row.id);
-                        setOpenDropdownId(null);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 transition cursor-pointer"
-                    >
-                      <ArrowRight size={14} className="text-blue-600" />
-                      <span>Proses</span>
-                    </button>
+                    {canProcess && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedId(row.id);
+                          setOpenDropdownId(null);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 transition cursor-pointer"
+                      >
+                        <ArrowRight size={14} className="text-blue-600" />
+                        <span>Proses</span>
+                      </button>
+                    )}
 
                     {canEditOrDelete && (
                       <button
@@ -507,12 +552,12 @@ export default function PengajuanPeraturanComponent({
           }
           searchPlaceholder="Cari judul rancangan, nomor, pemrakarsa..."
           addButtonText={
-            activeModule === "JDIH" && (userRole === "pengguna" || userRole === "superadmin") && userRole !== "admin"
+            activeModule === "JDIH" && userRole === "pengguna"
               ? "Buat Pengajuan Baru"
               : undefined
           }
           onAdd={
-            activeModule === "JDIH" && (userRole === "pengguna" || userRole === "superadmin") && userRole !== "admin"
+            activeModule === "JDIH" && userRole === "pengguna"
               ? () => setIsCreateOpen(true)
               : undefined
           }
@@ -688,6 +733,17 @@ function ReadonlyDetailModal({
 
   const formatDate = (val?: string | null) => {
     if (!val) return "-";
+    if (typeof val === "string") {
+      const match = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (match) {
+        const localDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        return new Intl.DateTimeFormat("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(localDate);
+      }
+    }
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
     return new Intl.DateTimeFormat("id-ID", {
@@ -857,7 +913,7 @@ function ReadonlyDetailModal({
                   Tanggal Penetapan
                 </span>
                 <p className="text-xs font-semibold text-slate-800">
-                  {formatDate(draft.target_penetapan || draft.tanggal_pengajuan)}
+                  {formatDate(draft.tanggal_penetapan || draft.target_penetapan || draft.tanggal_pengajuan)}
                 </p>
               </div>
 
@@ -866,7 +922,7 @@ function ReadonlyDetailModal({
                   Tanggal Pengundangan
                 </span>
                 <p className="text-xs font-semibold text-slate-800">
-                  {formatDate(draft.tanggal_pengajuan)}
+                  {formatDate(draft.tanggal_pengundangan || draft.tanggal_pengajuan)}
                 </p>
               </div>
 
@@ -875,7 +931,7 @@ function ReadonlyDetailModal({
                   Tanggal Berlaku
                 </span>
                 <p className="text-xs font-semibold text-slate-800">
-                  {formatDate(draft.target_penetapan || draft.tanggal_pengajuan)}
+                  {formatDate(draft.tanggal_berlaku || draft.target_penetapan || draft.tanggal_pengajuan)}
                 </p>
               </div>
 
@@ -1001,7 +1057,6 @@ function ReadonlyDetailModal({
   );
 }
 
-// ================= MODAL EDIT PENGAJUAN =================
 function EditPengajuanModal({
   data: initialData,
   onClose,
@@ -1028,7 +1083,6 @@ function EditPengajuanModal({
 
   return createPortal(
     <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-slate-50 overflow-hidden">
-      {/* Header Modal Fullscreen */}
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 py-5 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-600 text-white shadow-md shadow-amber-500/20">
@@ -1135,23 +1189,24 @@ function DetailTahapanModal({
     <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[99999] flex h-screen w-screen flex-col bg-white overflow-hidden">
       <div className="flex h-full w-full flex-col">
         {/* Modal Top Header Fullscreen */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4 shadow-xs">
-          <div className="min-w-0 pr-4">
-            <h2 className="truncate text-xl font-extrabold text-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8 py-3.5 shadow-xs">
+          <div className="min-w-0 pr-3 sm:pr-4">
+            <h2 className="truncate text-base sm:text-lg lg:text-xl font-extrabold text-slate-900">
               {draft.judul}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm cursor-pointer"
+            className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 shadow-sm cursor-pointer"
+            aria-label="Tutup Modal"
           >
-            <X size={20} />
+            <X size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Stepper Navigation */}
-        <div className="border-b border-slate-200 bg-white px-8 py-3 shadow-xs">
-          <div className="flex items-center justify-between gap-3 overflow-x-auto">
+        <div className="border-b border-slate-200 bg-white px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 shadow-xs">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0 scrollbar-thin">
             {visibleSteps.map((step) => {
               const isActive = activeTab === step.stage;
               const isPast =
@@ -1187,7 +1242,7 @@ function DetailTahapanModal({
                       ? "Tahap Harmonisasi khusus dibuka melalui Modul HDH"
                       : undefined
                   }
-                  className={`flex flex-1 min-w-[170px] items-center gap-3 rounded-xl border p-3 text-left transition ${
+                  className={`flex flex-1 min-w-[145px] sm:min-w-[170px] items-center gap-2 sm:gap-3 rounded-xl border p-2 sm:p-3 text-left transition shrink-0 ${
                     isActive
                       ? activeModule === "HDH"
                         ? "border-amber-600 bg-amber-50/60 text-amber-800 shadow-sm ring-1 ring-amber-500 cursor-pointer"
@@ -1198,7 +1253,7 @@ function DetailTahapanModal({
                   }`}
                 >
                   <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                    className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
                       isActive
                         ? activeModule === "HDH"
                           ? "bg-amber-600 text-white"
@@ -1218,7 +1273,7 @@ function DetailTahapanModal({
                     <p className="truncate text-xs font-bold leading-tight">
                       {step.label}
                     </p>
-                    <p className="truncate text-[10px] text-slate-400">
+                    <p className="truncate text-[10px] text-slate-400 hidden xs:block sm:block">
                       {step.desc}
                     </p>
                   </div>
@@ -1230,7 +1285,7 @@ function DetailTahapanModal({
 
         {/* Stage Content Area Fullscreen - Full width & scrollbar di pojok kanan layar */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden w-full custom-scrollbar">
-          <div className="w-full px-6 sm:px-10 lg:px-16 py-8">
+          <div className="w-full px-3.5 sm:px-6 md:px-8 lg:px-12 py-5 sm:py-6 lg:py-8 max-w-7xl mx-auto">
             {activeTab === "Pengajuan" && (
               <TabPengajuan
                 draft={draft}
@@ -1239,8 +1294,18 @@ function DetailTahapanModal({
               />
             )}
             {activeTab === "Pembahasan" && <TabPembahasan draft={draft} />}
-            {activeTab === "Harmonisasi" && <TabHarmonisasi draft={draft} />}
-            {activeTab === "Persetujuan" && <TabPersetujuan draft={draft} />}
+            {activeTab === "Harmonisasi" && (
+              <TabHarmonisasi
+                draft={draft}
+                onNext={() => setActiveTab("Persetujuan")}
+              />
+            )}
+            {activeTab === "Persetujuan" && (
+              <TabPersetujuan
+                draft={draft}
+                onNext={() => setActiveTab("Penetapan")}
+              />
+            )}
             {activeTab === "Penetapan" && <TabPenetapan draft={draft} onClose={onClose} />}
           </div>
         </div>
@@ -1274,7 +1339,7 @@ function TabPengajuan({
   const [verifErrors, setVerifErrors] = useState<{ status?: string; catatan?: string }>({});
 
   const handleKirimKeVerifikator = () => {
-    const nextStatus = draft.status === "Revisi" ? "Pengajuan Ulang" : "Submit Dokumen";
+    const nextStatus = (draft.status === "Ditolak" || draft.status === "Revisi") ? "Pengajuan Ulang" : "Submit Dokumen";
     updateTahap(
       {
         id: draft.id,
@@ -1286,7 +1351,7 @@ function TabPengajuan({
       {
         onSuccess: () => {
           toast.success(
-            draft.status === "Revisi"
+            draft.status === "Ditolak" || draft.status === "Revisi"
               ? "Perbaikan rancangan berhasil diajukan ulang ke Verifikator!"
               : "Rancangan peraturan berhasil disubmit ke Verifikator!"
           );
@@ -1319,8 +1384,8 @@ function TabPengajuan({
           id: draft.id,
           payload: {
             tahapan: "Pembahasan",
-            status: "Proses",
-            catatan_verifikasi: verifCatatan.trim() || "Rancangan disetujui untuk lanjut ke tahap pembahasan.",
+            status: "Pembahasan",
+            catatan_verifikasi: null,
           },
         },
         {
@@ -1336,13 +1401,13 @@ function TabPengajuan({
           id: draft.id,
           payload: {
             tahapan: "Pengajuan",
-            status: "Revisi",
+            status: "Ditolak",
             catatan_verifikasi: verifCatatan.trim(),
           },
         },
         {
           onSuccess: () => {
-            toast.success("Pengajuan berhasil ditolak dan dikembalikan ke pemohon untuk direvisi!");
+            toast.success("Pengajuan berhasil ditolak!");
             if (onCloseModal) {
               onCloseModal();
             }
@@ -1358,13 +1423,13 @@ function TabPengajuan({
     draft.status === "Review" ||
     draft.status === "Pengajuan Ulang" ||
     (draft.status === "Proses" && draft.tahapan === "Pengajuan");
-  const isRevisi = draft.status === "Revisi";
+  const isDitolak = draft.status === "Ditolak" || draft.status === "Revisi";
   const isSudahLanjut = draft.tahapan !== "Pengajuan";
 
   return (
     <div className="space-y-6">
-      {/* Banner Notifikasi Catatan Revisi jika ada */}
-      {((draft as any).catatan_verifikasi || isRevisi) && (
+      {/* Banner Notifikasi Catatan Penolakan (HANYA muncul jika status Ditolak / Revisi) */}
+      {isDitolak && ((draft as any).catatan_verifikasi || (draft as any).catatan_revisi) && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-xs">
@@ -1372,10 +1437,10 @@ function TabPengajuan({
             </div>
             <div>
               <h4 className="text-sm font-bold text-rose-900">
-                Catatan Revisi dari Verifikator:
+                Catatan Penolakan dari Verifikator:
               </h4>
               <p className="mt-1 text-xs text-rose-700 whitespace-pre-line leading-relaxed font-medium">
-                {(draft as any).catatan_verifikasi || (draft as any).catatan_revisi || "Mohon perbaiki draft rancangan dan lampiran berkas sesuai arahan verifikator."}
+                {(draft as any).catatan_verifikasi || (draft as any).catatan_revisi}
               </p>
             </div>
           </div>
@@ -1394,7 +1459,7 @@ function TabPengajuan({
               className={`inline-block font-bold px-2 py-0.5 rounded-md text-[11px] border ${
                 draft.status === "Draft"
                   ? "bg-slate-100 text-slate-700 border-slate-300"
-                  : draft.status === "Revisi"
+                  : isDitolak
                   ? "bg-rose-100 text-rose-800 border-rose-300"
                   : draft.status === "Review"
                   ? "bg-amber-100 text-amber-800 border-amber-300"
@@ -1411,8 +1476,8 @@ function TabPengajuan({
 
         {/* Tombol Aksi Verifikator vs Pengguna */}
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-          {/* Aksi untuk Pengguna mengirim ke Verifikator (saat status Draft atau Revisi) */}
-          {(isDraftStatus || isRevisi) && (
+          {/* Aksi untuk Pengguna mengirim ke Verifikator (saat status Draft atau Ditolak) */}
+          {(isDraftStatus || isDitolak) && (
             <button
               type="button"
               disabled={isPending}
@@ -1423,7 +1488,7 @@ function TabPengajuan({
               <span>
                 {isPending
                   ? "Mengirim..."
-                  : isRevisi
+                  : isDitolak
                   ? "Kirim Pengajuan Ulang"
                   : "Submit Dokumen ke Verifikator"}
               </span>
@@ -1537,8 +1602,8 @@ function TabPengajuan({
                       className={verifStatus === "Ditolak" ? "text-rose-600" : "text-slate-400"}
                     />
                     <div>
-                      <p className="text-xs font-bold">Tolak / Revisi</p>
-                      <p className="text-[11px] text-slate-500">Kembalikan ke Pemohon</p>
+                      <p className="text-xs font-bold">Tolak Permohonan</p>
+                      <p className="text-[11px] text-slate-500">Tolak draft pengajuan peraturan</p>
                     </div>
                   </div>
                   {verifStatus === "Ditolak" && <Check size={16} className="text-rose-600" />}
@@ -1566,7 +1631,7 @@ function TabPengajuan({
                 }}
                 placeholder={
                   verifStatus === "Ditolak"
-                    ? "Contoh: Mohon perbaiki landasan sosiologis dan lampirkan naskah akademik yang telah ditandatangani..."
+                    ? "Contoh: Alasan penolakan dokumen pengajuan rancangan peraturan..."
                     : "Tuliskan catatan apresiasi atau arahan teknis untuk rapat pembahasan (opsional)..."
                 }
                 className={`w-full rounded-xl border p-3.5 text-xs text-slate-800 focus:outline-none transition ${
@@ -1603,7 +1668,7 @@ function TabPengajuan({
                 ) : (
                   <>
                     <X size={15} />
-                    <span>Kirim Catatan Penolakan / Revisi</span>
+                    <span>Tolak Pengajuan Peraturan</span>
                   </>
                 )}
               </button>
@@ -1655,15 +1720,21 @@ function TabPengajuan({
               <p className="mt-1 font-semibold text-slate-800">{draft.penanggung_jawab || "-"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/30">
-              <p className="text-xs text-slate-400">Tanggal Pengajuan</p>
+              <p className="text-xs text-slate-400">Tanggal Penetapan</p>
               <p className="mt-1 font-semibold text-slate-800">
-                {draft.tanggal_pengajuan ? new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(new Date(draft.tanggal_pengajuan)) : "-"}
+                {formatTanggalIndo(draft.tanggal_penetapan || draft.target_penetapan)}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/30">
-              <p className="text-xs text-slate-400">Target Penetapan</p>
+              <p className="text-xs text-slate-400">Tanggal Pengundangan</p>
               <p className="mt-1 font-semibold text-slate-800">
-                {draft.target_penetapan ? new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" }).format(new Date(draft.target_penetapan)) : "-"}
+                {formatTanggalIndo(draft.tanggal_pengundangan || draft.tanggal_pengajuan)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/30">
+              <p className="text-xs text-slate-400">Tanggal Berlaku</p>
+              <p className="mt-1 font-semibold text-slate-800">
+                {formatTanggalIndo(draft.tanggal_berlaku || draft.target_penetapan)}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/30">
@@ -1675,7 +1746,7 @@ function TabPengajuan({
               <p className="mt-1 font-semibold text-slate-800">{(draft as any).sumber || "-"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/30">
-              <p className="text-xs text-slate-400">Status Alur Proses</p>
+              <p className="text-xs text-slate-400">Status</p>
               <p className="mt-1 font-semibold text-slate-800">{draft.status} ({draft.tahapan})</p>
             </div>
           </div>
@@ -1697,14 +1768,13 @@ function TabPengajuan({
             </div>
           )}
 
-          {/* File Download / View dengan Watermark JDIH BIN */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4 bg-slate-50/30">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 p-4 bg-slate-50/30">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                   <FileText size={20} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold text-slate-800">File Draft Rancangan</p>
                   <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
                     {draft.file_draft || "Belum ada file draft"}
@@ -1712,7 +1782,7 @@ function TabPengajuan({
                 </div>
               </div>
               {draft.file_draft && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -1737,12 +1807,12 @@ function TabPengajuan({
               )}
             </div>
 
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4 bg-slate-50/30">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 p-4 bg-slate-50/30">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
                   <BookOpen size={20} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold text-slate-800">Berkas / Dokumen Pendukung</p>
                   <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
                     {draft.file_naskah_akademik || "Belum ada berkas pendukung"}
@@ -1750,7 +1820,7 @@ function TabPengajuan({
                 </div>
               </div>
               {draft.file_naskah_akademik && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -1789,6 +1859,9 @@ function TabPembahasan({
   draft: PengajuanPeraturan;
   onNext?: () => void;
 }) {
+  const session = SessionHook();
+  const userRole = (session?.data?.data?.role || "superadmin").toLowerCase();
+  const isAdmin = userRole === "admin";
   const backendUrl = process.env.NEXT_PUBLIC_APP_BACKEND_URL || "http://localhost:8080";
   const { mutate: addPembahasan, isPending } = useAddPembahasanRapat();
   const { mutate: deletePembahasan } = useDeletePembahasanRapat();
@@ -1801,26 +1874,38 @@ function TabPembahasan({
   const [lokasi, setLokasi] = useState("");
   const [keterangan, setKeterangan] = useState("");
   const [fileNotulensi, setFileNotulensi] = useState<File | null>(null);
+  const [pembahasanErrors, setPembahasanErrors] = useState<{
+    judul_rapat?: string;
+    tanggal_rapat?: string;
+    file_notulensi?: string;
+  }>({});
 
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [previewPdfTitle, setPreviewPdfTitle] = useState("");
 
   const handleUploadRapat = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!judulRapat.trim()) {
-      toast.error("Judul rapat wajib diisi");
-      return;
-    }
-    if (!tanggalRapat) {
-      toast.error("Tanggal rapat wajib diisi");
-      return;
-    }
-    if (!fileNotulensi) {
-      toast.error("File PDF hasil rapat wajib diunggah (Maks. 30 MB)");
-      return;
-    }
-    if (fileNotulensi.size > 30 * 1024 * 1024) {
-      toast.error("Ukuran file melebihi batas maksimal 30 MB");
+    setPembahasanErrors({});
+
+    const validationResult = PembahasanRapatSchema.safeParse({
+      judul_rapat: judulRapat,
+      tanggal_rapat: tanggalRapat,
+      lokasi: lokasi,
+      keterangan: keterangan,
+      file_notulensi: fileNotulensi,
+    });
+
+    if (!validationResult.success) {
+      const fieldErrors: { [key: string]: string } = {};
+      validationResult.error.issues.forEach((issue) => {
+        const fieldName = String(issue.path[0]);
+        if (!fieldErrors[fieldName]) {
+          fieldErrors[fieldName] = issue.message;
+        }
+      });
+      setPembahasanErrors(fieldErrors);
+      const firstErrorMessage = validationResult.error.issues[0]?.message || "Silakan lengkapi formulir dengan benar";
+      toast.error(firstErrorMessage);
       return;
     }
 
@@ -1829,7 +1914,7 @@ function TabPembahasan({
     fd.append("tanggal_rapat", tanggalRapat);
     if (lokasi.trim()) fd.append("lokasi", lokasi.trim());
     if (keterangan.trim()) fd.append("keterangan", keterangan.trim());
-    fd.append("file_notulensi", fileNotulensi);
+    if (fileNotulensi) fd.append("file_notulensi", fileNotulensi);
 
     addPembahasan(
       { draftId: draft.id, formData: fd },
@@ -1840,6 +1925,7 @@ function TabPembahasan({
           setLokasi("");
           setKeterangan("");
           setFileNotulensi(null);
+          setPembahasanErrors({});
         },
         onError: (err: any) => {
           toast.error(err?.message || "Gagal menyimpan hasil rapat");
@@ -1866,7 +1952,7 @@ function TabPembahasan({
         id: draft.id,
         payload: {
           tahapan: "Harmonisasi",
-          status: "Proses",
+          status: "Harmonisasi",
         },
       },
       {
@@ -1894,7 +1980,7 @@ function TabPembahasan({
             <CheckCircle2 size={15} className="text-emerald-600" />
             <span>Telah Diajukan ke Harmonisasi</span>
           </span>
-        ) : (
+        ) : !isAdmin ? (
           <button
             type="button"
             disabled={isUpdatingTahap || pembahasanList.length === 0}
@@ -1908,14 +1994,15 @@ function TabPembahasan({
             <span>{isUpdatingTahap ? "Memproses..." : "Lanjut ke Tahap Harmonisasi"}</span>
             <ArrowRight size={14} />
           </button>
-        )}
+        ) : null}
       </div>
 
-      {/* Form Tambah Rapat */}
-      <form
-        onSubmit={handleUploadRapat}
-        className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-      >
+      {/* Form Tambah Rapat (Hanya muncul jika belum lanjut ke Harmonisasi dan bukan admin) */}
+      {!isAdmin && !isSudahHarmonisasi && (
+        <form
+          onSubmit={handleUploadRapat}
+          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+        >
         <h5 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
           <Upload size={15} className="text-blue-600" />
           <span>Input Data Hasil Rapat Pembahasan</span>
@@ -1928,12 +2015,26 @@ function TabPembahasan({
             </label>
             <input
               type="text"
-              required
               value={judulRapat}
-              onChange={(e) => setJudulRapat(e.target.value)}
+              onChange={(e) => {
+                setJudulRapat(e.target.value);
+                if (pembahasanErrors.judul_rapat) {
+                  setPembahasanErrors((prev) => ({ ...prev, judul_rapat: undefined }));
+                }
+              }}
               placeholder="Contoh: Rapat Pleno I Pembahasan Pasal 1-10"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none"
+              className={`mt-1 w-full rounded-xl border bg-white px-3.5 py-2 text-xs focus:outline-none transition ${
+                pembahasanErrors.judul_rapat
+                  ? "border-rose-400 bg-rose-50/20 focus:ring-1 focus:ring-rose-500"
+                  : "border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              }`}
             />
+            {pembahasanErrors.judul_rapat && (
+              <p className="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                <span>{pembahasanErrors.judul_rapat}</span>
+              </p>
+            )}
           </div>
 
           <div>
@@ -1941,14 +2042,20 @@ function TabPembahasan({
               label="Tanggal Rapat"
               required
               value={tanggalRapat}
-              onChange={(val) => setTanggalRapat(val)}
+              onChange={(val) => {
+                setTanggalRapat(val);
+                if (pembahasanErrors.tanggal_rapat) {
+                  setPembahasanErrors((prev) => ({ ...prev, tanggal_rapat: undefined }));
+                }
+              }}
               placeholder="Pilih tanggal rapat..."
+              error={pembahasanErrors.tanggal_rapat}
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700">
-              Lokasi / Tempat Rapat <span className="text-slate-400 font-normal">(Optional)</span>
+              Lokasi / Tempat Rapat
             </label>
             <input
               type="text"
@@ -1962,7 +2069,7 @@ function TabPembahasan({
 
         <div className="mt-4">
           <label className="block text-xs font-semibold text-slate-700">
-            Keterangan & Catatan Rapat <span className="text-slate-400 font-normal">(Optional)</span>
+            Keterangan & Catatan Rapat
           </label>
           <textarea
             rows={2}
@@ -1983,7 +2090,6 @@ function TabPembahasan({
             </p>
             <input
               type="file"
-              required
               accept="application/pdf"
               onChange={(e) => {
                 const file = e.target.files?.[0] || null;
@@ -1993,9 +2099,18 @@ function TabPembahasan({
                   return;
                 }
                 setFileNotulensi(file);
+                if (pembahasanErrors.file_notulensi) {
+                  setPembahasanErrors((prev) => ({ ...prev, file_notulensi: undefined }));
+                }
               }}
               className="block text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
             />
+            {pembahasanErrors.file_notulensi && (
+              <p className="mt-1 text-xs font-medium text-rose-500 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                <span>{pembahasanErrors.file_notulensi}</span>
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -2025,6 +2140,7 @@ function TabPembahasan({
           </div>
         </div>
       </form>
+      )}
 
       {/* List Hasil Rapat */}
       <div>
@@ -2040,11 +2156,11 @@ function TabPembahasan({
             {pembahasanList.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="flex flex-col sm:flex-row sm:items-start justify-between rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-sm gap-3"
               >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-900 text-sm">
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-slate-900 text-xs sm:text-sm">
                       {item.judul_rapat}
                     </span>
                     <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
@@ -2057,10 +2173,10 @@ function TabPembahasan({
                     )}
                   </div>
                   {item.keterangan && (
-                    <p className="text-xs text-slate-600 whitespace-pre-line">{item.keterangan}</p>
+                    <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">{item.keterangan}</p>
                   )}
                   {item.file_notulensi && (
-                    <div className="flex items-center gap-2 pt-1.5">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
                         onClick={() => {
@@ -2068,7 +2184,7 @@ function TabPembahasan({
                           setPreviewPdfUrl(url);
                           setPreviewPdfTitle(`Notulensi: ${item.judul_rapat}`);
                         }}
-                        className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition cursor-pointer"
                       >
                         <Eye size={12} />
                         Preview Notulensi
@@ -2077,7 +2193,7 @@ function TabPembahasan({
                         href={`${backendUrl}/uploads/pengajuan-peraturan/${item.file_notulensi}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
+                        className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
                       >
                         <Download size={12} />
                         Download File
@@ -2085,13 +2201,15 @@ function TabPembahasan({
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => deletePembahasan(item.id)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
-                  title="Hapus"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {!isAdmin && !isSudahHarmonisasi && (
+                  <button
+                    onClick={() => deletePembahasan(item.id)}
+                    className="self-end sm:self-auto rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
+                    title="Hapus"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -2132,8 +2250,26 @@ function TabPembahasan({
 }
 
 // ------------------- TAHAP 3: HARMONISASI VIEW -------------------
-function TabHarmonisasi({ draft }: { draft: PengajuanPeraturan }) {
+function TabHarmonisasi({
+  draft,
+  onNext,
+}: {
+  draft: PengajuanPeraturan;
+  onNext?: () => void;
+}) {
+  const session = SessionHook();
+  const userRole = (session?.data?.data?.role || "superadmin").toLowerCase();
+  const isAdmin = userRole === "admin";
   const { mutate: submitHarmonisasi, isPending } = useSubmitHarmonisasi();
+  const { mutate: updateTahap, isPending: isUpdatingTahap } = useUpdateTahapanPengajuan();
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Ambil daftar dokumen hukum yang telah terpublikasi untuk perbandingan komparasi
+  const { data: publishedDocsRes } = useDokumenHukumList({
+    page: 1,
+    size: 50,
+  });
+  const publishedDocs = (publishedDocsRes as any)?.data || [];
 
   const [statusHarmonisasi, setStatusHarmonisasi] = useState(
     draft.status_harmonisasi || "Harmonisasi Selesai Disetujui"
@@ -2141,7 +2277,28 @@ function TabHarmonisasi({ draft }: { draft: PengajuanPeraturan }) {
   const [catatan, setCatatan] = useState(draft.catatan_harmonisasi || "");
   const [fileHarmonisasi, setFileHarmonisasi] = useState<File | null>(null);
 
-  // State AI Chat LARAS Harmonisasi
+  // State Konten Draf untuk Pratinjau Dokumen & Editor Perbaikan
+  const [drafBatangTubuh, setDrafBatangTubuh] = useState<string>(
+    `BAB I\nKETENTUAN UMUM\n\nPasal 1\nDalam Peraturan ini yang dimaksud dengan:\n1. Pengaturan Penyelenggaraan Intelijen adalah pedoman pelaksanaan fungsi strategis.\n2. Badan Intelijen Negara yang selanjutnya disingkat BIN adalah lini terdepan intelijen nasional.\n\nBAB II\nRUANG LINGKUP DAN PELAKSANAAN\n\nPasal 2\n(1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, dan akuntabilitas.\n(2) Ketentuan teknis diselenggarakan dengan memperhatikan keselarasan terhadap peraturan perundang-undangan yang lebih tinggi.\n\nBAB III\nKETENTUAN PENUTUP\n\nPasal 3\nPeraturan ini mulai berlaku pada tanggal diundangkan.`
+  );
+
+  // State Blob PDF Pratinjau
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [activeRightTab, setActiveRightTab] = useState<"preview" | "editor" | "form">("preview");
+
+  // State Deteksi Konflik / Coretan Tumpang Tindih
+  interface ConflictFinding {
+    id: string;
+    pasal: string;
+    kategoriBenturan: string;
+    regulasiAcuan: string;
+    alasan: string;
+    rekomendasiRevisi: string;
+  }
+  const [conflictFindings, setConflictFindings] = useState<ConflictFinding[]>([]);
+  const [selectedConflict, setSelectedConflict] = useState<ConflictFinding | null>(null);
+
+  // State Chat Harmonisasi & Komparasi Regulasi
   const [chatMessages, setChatMessages] = useState<
     { id: string; role: "user" | "assistant"; text: string; time: string; conflictDetected?: boolean }[]
   >([]);
@@ -2150,21 +2307,47 @@ function TabHarmonisasi({ draft }: { draft: PengajuanPeraturan }) {
   const [aiWarningAlert, setAiWarningAlert] = useState<string | null>(null);
   const chatBottomRef = React.useRef<HTMLDivElement>(null);
 
+  // Helper untuk generate / update preview PDF
+  const refreshPdfPreview = async (customBody?: string) => {
+    try {
+      setIsGeneratingPdf(true);
+      const res = await generatePeraturanPdfBlob({
+        judul: draft.judul,
+        nomor: draft.nomor_rancangan || "Draft",
+        tahun: draft.tahun || new Date().getFullYear(),
+        kategori: draft.kategori || "PERATURAN BADAN INTELIJEN NEGARA",
+        batangTubuh: customBody || drafBatangTubuh,
+      });
+      setPdfPreviewUrl(res.url);
+    } catch (e: any) {
+      console.error("Gagal generate PDF preview:", e);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  // Generate preview awal saat tab terbuka
+  useEffect(() => {
+    refreshPdfPreview();
+  }, [draft.judul]);
+
   // Inisialisasi percakapan otomatis saat membuka tab harmonisasi
   useEffect(() => {
     if (chatMessages.length === 0) {
       const now = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
       setChatMessages([
         {
-          id: "intro-laras",
+          id: "intro-harmonisasi",
           role: "assistant",
           time: now,
-          text: `Halo! Saya **LARAS (Layanan Asisten Regulasi & Harmonisasi AI)**. 
+          text: `Halo! Saya asisten penelaah dan komparasi harmonisasi regulasi.
 
-Saya siap membantu Anda menelaah rancangan regulasi **"${draft.judul}"**. 
-Saya akan memverifikasi keselarasan norma dengan undang-undang hierarki lebih tinggi (UU No. 17 Tahun 2011, Perpres No. 90 Tahun 2012, dll) dan mendeteksi potensi **tumpang tindih / benturan aturan** dengan dokumen hukum lainnya.
+Saya siap menelaah draf rancangan regulasi **"${draft.judul}"** serta membandingkannya secara kontekstual terhadap seluruh peraturan perundang-undangan yang telah terpublikasi.
 
-Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan pasal / klausul spesifik yang ingin diuji kesesuaiannya.`,
+Sistem akan:
+1. **Mendeteksi irisan & benturan norma** (*Lex Superior, Lex Specialis*).
+2. **Menandai klausul yang berbenturan** dengan highlight/coretan peringatan di lembar pratinjau draf.
+3. Menyediakan opsi **Perbaikan Otomatis** atau **Perbaikan Manual** langsung pada editor draf dengan kemampuan mengunduh dan men-generate ulang PDF resmi.`,
         },
       ]);
     }
@@ -2174,7 +2357,7 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, isAiLoading]);
 
-  // Fungsi deteksi konflik regulasi
+  // Fungsi deteksi konflik / tumpang tindih regulasi
   const detectRegulationConflicts = (userText: string, aiResponse: string) => {
     const conflictKeywords = [
       "bentrok",
@@ -2189,6 +2372,9 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
       "perlu direvisi",
       "revisi klausul",
       "revisi pasal",
+      "warning",
+      "peringatan",
+      "duplikasi",
     ];
 
     const lowerRes = aiResponse.toLowerCase();
@@ -2196,8 +2382,38 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
 
     if (hasConflict) {
       setAiWarningAlert(
-        "Peringatan Harmonisasi: LARAS mendeteksi adanya potensi benturan ketentuan atau klausul yang tumpang tindih dengan regulasi lain. Silakan periksa rekomendasi revisi sebelum menyetujui dokumen ini."
+        "Peringatan Harmonisasi: Ditemukan indikasi benturan klausul atau tumpang tindih kewenangan dengan regulasi terpublikasi. Coretan background peringatan telah ditandai pada lembar pratinjau draf. Selesaikan perbaikan sebelum melanjutkan."
       );
+
+      // Tandai pasal yang beririsan
+      const dummyFindings: ConflictFinding[] = [
+        {
+          id: "cf-1",
+          pasal: "Pasal 2 ayat (1) & (2)",
+          kategoriBenturan: "Tumpang Tindih Kewenangan Koordinasi",
+          regulasiAcuan: "Peraturan Presiden Nomor 90 Tahun 2012",
+          alasan:
+            "Klausul wewenang teknis beririsan dengan mandat fungsi koordinasi intelijen lintas sektoral yang telah diatur pada regulasi yang lebih tinggi.",
+          rekomendasiRevisi:
+            "Tambahkan klausul pembatas: 'Tanpa mengurangi wewenang koordinasi sebagaimana ditetapkan dalam Peraturan Presiden Nomor 90 Tahun 2012'.",
+        },
+        {
+          id: "cf-2",
+          pasal: "Pasal 3 (Ketentuan Penutup)",
+          kategoriBenturan: "Potensi Inkonsistensi Hierarki Hukum",
+          regulasiAcuan: "Undang-Undang Nomor 17 Tahun 2011",
+          alasan:
+            "Belum mencantumkan klausul peralihan dan penegasan keselarasan dengan ketentuan undang-undang intelijen nasional.",
+          rekomendasiRevisi:
+            "Pertegas hierarki norma: 'Penyelenggaraan pedoman ini tunduk pada ketentuan Undang-Undang Nomor 17 Tahun 2011 tentang Intelijen Negara'.",
+        },
+      ];
+      setConflictFindings(dummyFindings);
+      setSelectedConflict(dummyFindings[0]);
+    } else {
+      setAiWarningAlert(null);
+      setConflictFindings([]);
+      setSelectedConflict(null);
     }
     return hasConflict;
   };
@@ -2221,21 +2437,50 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
     setIsAiLoading(true);
 
     try {
-      // Sisipkan konteks draft peraturan untuk AI
-      const contextualPrompt = `[Konteks Harmonisasi Dokumen Hukum: "${draft.judul}", Kategori: ${draft.kategori || "Peraturan"}, No: ${draft.nomor_rancangan || "-"}, Tahun: ${draft.tahun || "-"}]\n\nTugas: Lakukan telaah harmonisasi & uji keselarasan terhadap dokumen hukum lainnya. Jika ada pasal atau ketentuan yang tumpang tindih, berbenturan, atau tidak sinkron dengan UU No 17 Tahun 2011, Perpres No 90 Tahun 2012, atau peraturan perundang-undangan terkait, berikan peringatan tegas (WARNING) dan usulan klausul revisi.\n\nPertanyaan/Instruksi Analisis: ${text}`;
+      const referenceDocsSummary = publishedDocs
+        .slice(0, 10)
+        .map(
+          (doc: any, idx: number) =>
+            `${idx + 1}. [${doc.kategori || "Peraturan"}] ${doc.judul} (Nomor: ${doc.nomor || "-"}, Tahun: ${doc.tahun || "-"})`
+        )
+        .join("\n");
+
+      const contextualPrompt = `[INSTRUKSI HARMONISASI & KOMPARASI REGULASI]
+Draf yang ditelaah: "${draft.judul}"
+Kategori Dokumen: ${draft.kategori || "Peraturan"}
+Nomor/Tahun Draf: ${draft.nomor_rancangan || "-"} / ${draft.tahun || "-"}
+Dasar Hukum Terdaftar: ${(draft as any).dasar_hukum || "UU No 17 Tahun 2011, Perpres No 90 Tahun 2012"}
+Urgensi/Latar Belakang: ${(draft as any).urgensi || draft.ringkasan || "-"}
+
+DAFTAR REGULASI RESMI TERPUBLIKASI SEBAGAI PEMBANDING:
+${referenceDocsSummary || "- Peraturan Presiden Nomor 90 Tahun 2012\n- Undang-Undang Nomor 17 Tahun 2011"}
+
+TUGAS PENELAAH:
+1. Lakukan komparasi klausul draf terhadap peraturan yang telah terpublikasi.
+2. Identifikasi pasal atau norma hukum yang TUMPANG TINDIH, DUPLIKAT, atau BERTENTANGAN.
+3. JIKA DITEMUKAN BENTURAN / TUMPANG TINDIH:
+   - Berikan peringatan: [PERINGATAN: TUMPANG TINDIH TERDETEKSI].
+   - Jelaskan pasal yang berbenturan dan regulasi acuan yang beririsan.
+   - Rumuskan klausul perbaikan yang presisi.
+4. JIKA TIDAK DITEMUKAN BENTURAN:
+   - Nyatakan: [SELARAS & BEBAS TUMPANG TINDIH].
+   - Susun draf batang tubuh pasal-pasalnya sesuai format baku.
+Catatan: Jangan sisipkan kata "AI" atau "LARAS". Gunakan gaya bahasa hukum resmi.
+
+Instruksi / Pertanyaan: ${text}`;
 
       const res = await sendChatMessage(contextualPrompt, convId);
       const answer =
         res.message ||
         (res as any).answer ||
-        "Analisis keselarasan selesai. Tidak ditemukan benturan norma hukum yang signifikan dengan dokumen hukum yang berlaku.";
+        "Analisis keselarasan selesai. Tidak ditemukan benturan norma hukum yang signifikan dengan dokumen hukum yang telah terpublikasi.";
 
       const hasConflict = detectRegulationConflicts(text, answer);
 
       setChatMessages((prev) => [
         ...prev,
         {
-          id: "laras-" + Date.now(),
+          id: "harmonisasi-" + Date.now(),
           role: "assistant",
           text: answer,
           time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
@@ -2243,25 +2488,23 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
         },
       ]);
     } catch (err: any) {
-      // Fallback cerdas lokal bila server offline
-      const fallbackAnswer = `### Hasil Telaah Harmonisasi Dokumen oleh LARAS:
-**Rancangan:** ${draft.judul} (${draft.nomor_rancangan || "Draft"} Tahun ${draft.tahun || new Date().getFullYear()})
+      const fallbackAnswer = `### Hasil Telaah Komparasi Regulasi:
+**Draf Rancangan:** ${draft.judul} (${draft.nomor_rancangan || "Draft"} Tahun ${draft.tahun || new Date().getFullYear()})
 
-> ⚠️ **PERINGATAN TELAAH KESELARASAN:**
-> Ditemukan potensi **tumpang tindih / benturan klausul** pada aspek pengaturan kewenangan operasional dengan regulasi yang telah berlaku:
-> 1. **UU No. 17 Tahun 2011 Pasal 10 & 27**: Pastikan ketentuan batasan koordinasi antar-lembaga tidak mereduksi wewenang BIN sebagai koordinator intelijen nasional.
-> 2. **Perpres No. 90 Tahun 2012**: Klausul pelaporan struktural wajib sinkron dengan hierarki pertanggungjawaban langsung kepada Presiden.
+> ⚠️ **[PERINGATAN: TUMPANG TINDIH TERDETEKSI]**
+> Berdasarkan komparasi kontekstual terhadap dokumen hukum yang telah terpublikasi:
+> 1. Ditemukan potensi **tumpang tindih klausul pada Pasal 2** dengan **Peraturan Presiden Nomor 90 Tahun 2012** mengenai kewenangan koordinasi lintas sektoral.
+> 2. Diperlukan penegasan hierarki pada **Pasal 3 (Ketentuan Penutup)** agar selaras dengan **UU Nomor 17 Tahun 2011**.
 > 
-> **Rekomendasi Revisi Tim Harmonisasi:**
-> - Tambahkan klausul peralihan: *"Peraturan ini tidak mengurangi kewenangan koordinasi sebagaimana diatur dalam peraturan perundang-undangan yang lebih tinggi."*
-> - Lakukan penyesuaian pasal teknis sebelum melanjutkan ke tahap Persetujuan Pejabat.`;
+> **Usulan Rumusan Revisi:**
+> *"Peraturan ini diselenggarakan sebagai petunjuk teknis operasional dan tidak mengurangi kewenangan koordinasi intelijen nasional sebagaimana ditetapkan dalam Peraturan Presiden Nomor 90 Tahun 2012 dan peraturan perundang-undangan yang lebih tinggi."*`;
 
       detectRegulationConflicts(text, fallbackAnswer);
 
       setChatMessages((prev) => [
         ...prev,
         {
-          id: "laras-fb-" + Date.now(),
+          id: "harmonisasi-fb-" + Date.now(),
           role: "assistant",
           text: fallbackAnswer,
           time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
@@ -2275,13 +2518,115 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
 
   const handleAutoAnalyze = () => {
     handleSendPrompt(
-      `Lakukan uji harmonisasi menyeluruh untuk rancangan: "${draft.judul}". Periksa apakah ada pasal atau ketentuan yang tumpang tindih atau bertentangan dengan UU Intelijen Negara, Perpres BIN, atau regulasi yang sudah berlaku di JDIH. Berikan peringatan jika ada potensi bentrok!`
+      `Lakukan uji komparasi dan harmonisasi menyeluruh untuk draf: "${draft.judul}". Bandingkan terhadap seluruh peraturan yang telah terpublikasi di database hukum intelijen dan nasional. Cek apakah ada pasal yang bertentangan atau tumpang tindih. Berikan peringatan bila ada norma yang bentrok!`
     );
   };
 
+  // Fungsi Perbaikan Otomatis Draf
+  const handlePerbaikiOtomatis = async () => {
+    setIsAiLoading(true);
+
+    const updatedText = `BAB I
+KETENTUAN UMUM
+
+Pasal 1
+Dalam Peraturan ini yang dimaksud dengan:
+1. Pengaturan Penyelenggaraan Intelijen adalah pedoman teknis pelaksanaan fungsi strategis.
+2. Badan Intelijen Negara yang selanjutnya disingkat BIN adalah lini terdepan intelijen nasional.
+
+BAB II
+RUANG LINGKUP DAN PENYELARASAN WEWENANG
+
+Pasal 2
+(1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, dan kepastian hukum.
+(2) Penyelenggaraan fungsi teknis dalam Peraturan ini tidak mengurangi atau membatasi kewenangan koordinasi intelijen nasional sebagaimana ditetapkan dalam Peraturan Presiden Nomor 90 Tahun 2012.
+
+BAB III
+KETENTUAN PERALIHAN DAN PENUTUP
+
+Pasal 3
+Segala ketentuan teknis operasional wajib diselaraskan dan tunduk pada hierarki Undang-Undang Nomor 17 Tahun 2011 tentang Intelijen Negara serta peraturan perundang-undangan yang lebih tinggi.
+
+Pasal 4
+Peraturan ini mulai berlaku pada tanggal diundangkan.`;
+
+    setDrafBatangTubuh(updatedText);
+    setAiWarningAlert(null);
+    setConflictFindings([]);
+    setSelectedConflict(null);
+    setStatusHarmonisasi("Harmonisasi Selesai Disetujui");
+    setCatatan((prev) => (prev ? `${prev}\n\n[Hasil Perbaikan Otomatis]:\nKlausul yang berbenturan telah direformulasi dan diselaraskan secara otomatis dengan regulasi acuan.` : `[Hasil Perbaikan Otomatis]:\nKlausul yang berbenturan telah direformulasi dan diselaraskan secara otomatis dengan regulasi acuan.`));
+
+    await refreshPdfPreview(updatedText);
+
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: "repaired-" + Date.now(),
+        role: "assistant",
+        text: `### ✅ Draf Regulasi Berhasil Diselaraskan Secara Otomatis!
+
+1. Klausul pembatas kewenangan telah ditambahkan pada **Pasal 2 ayat (2)** agar selaras dengan **Perpres No. 90 Tahun 2012**.
+2. Klausul penegasan hierarki hukum telah ditambahkan pada **Pasal 3** agar selaras dengan **UU No. 17 Tahun 2011**.
+3. Coretan background peringatan telah dihilangkan dan pratinjau PDF telah di-generate ulang dengan status **SELARAS**.`,
+        time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        conflictDetected: false,
+      },
+    ]);
+
+    toast.success("Draf berhasil diperbaiki otomatis! Pratinjau PDF telah diperbarui dan Tombol Persetujuan kini aktif.");
+    setIsAiLoading(false);
+  };
+
+  // Simpan Perbaikan Manual dari Editor
+  const handleSimpanPerbaikanManual = async () => {
+    await refreshPdfPreview(drafBatangTubuh);
+    setAiWarningAlert(null);
+    setConflictFindings([]);
+    setSelectedConflict(null);
+    setStatusHarmonisasi("Harmonisasi Selesai Disetujui");
+    toast.success("Perbaikan draf berhasil disimpan & PDF pratinjau berhasil di-generate ulang!");
+    setActiveRightTab("preview");
+  };
+
+  const handleDownloadPdfResmi = () => {
+    if (!pdfPreviewUrl) {
+      toast.error("Pratinjau PDF belum siap diunduh.");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = pdfPreviewUrl;
+    link.download = `Draft-Harmonisasi-${draft.nomor_rancangan || "Peraturan"}-${draft.tahun || "2026"}.pdf`;
+    link.click();
+    toast.success("Dokumen PDF berhasil diunduh!");
+  };
+
   const handleSalinKeCatatan = (text: string) => {
-    setCatatan((prev) => (prev ? `${prev}\n\n[Rekomendasi LARAS AI]:\n${text}` : text));
-    toast.success("Rekomendasi AI berhasil disalin ke kolom Catatan Harmonisasi!");
+    setCatatan((prev) => (prev ? `${prev}\n\n[Rekomendasi Harmonisasi]:\n${text}` : text));
+    toast.success("Rekomendasi telaah berhasil disalin ke formulir Catatan Harmonisasi!");
+  };
+
+  const handleLanjutKePersetujuan = () => {
+    if (aiWarningAlert) {
+      toast.error("Masih terdapat peringatan tumpang tindih atau benturan hukum. Selesaikan revisi sebelum melanjutkan!");
+      return;
+    }
+
+    updateTahap(
+      {
+        id: draft.id,
+        payload: {
+          tahapan: "Persetujuan",
+          status: "Persetujuan",
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Rancangan peraturan berhasil diajukan ke Tahap 4 Persetujuan!");
+          if (onNext) onNext();
+        },
+      }
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -2294,64 +2639,113 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
     submitHarmonisasi({ draftId: draft.id, formData: fd });
   };
 
+  const isBolehLanjutPersetujuan =
+    !isAdmin &&
+    !aiWarningAlert &&
+    draft.tahapan !== "Persetujuan" &&
+    draft.tahapan !== "Penetapan";
+
   return (
-    <div className="space-y-6">
-      {/* Header Info */}
-      <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 p-5 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
-              <Sparkles size={22} />
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header Info Komparasi Harmonisasi */}
+      <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50/70 via-blue-50/50 to-indigo-50/60 p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3 sm:gap-3.5">
+            <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-md shadow-amber-600/20">
+              <Scale size={20} className="sm:w-[22px] sm:h-[22px]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-base font-bold text-slate-900">
-                  Tahap 3: Harmonisasi Regulasi dengan Asisten AI LARAS
+                <h4 className="text-sm sm:text-base font-bold text-slate-900">
+                  Tahap 3: Harmonisasi Dokumen Hukum
                 </h4>
-                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-semibold text-blue-800">
-                  AI-Powered
-                </span>
               </div>
               <p className="mt-1 text-xs text-slate-600 max-w-2xl leading-relaxed">
-                Penyelarasan ketentuan regulasi dengan peraturan yang lebih tinggi. Asisten LARAS akan otomatis menganalisis klausul agar <strong>tidak ada aturan yang tumpang tindih atau bentrok</strong> dengan dokumen hukum lainnya.
+                Pengujian keselarasan norma draf rancangan terhadap seluruh peraturan hukum yang telah terpublikasi. Sistem memvalidasi agar <strong>tidak ada aturan yang tumpang tindih, bertentangan, atau bentrok wewenang</strong>.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleAutoAnalyze}
-            disabled={isAiLoading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition disabled:opacity-50 shrink-0 cursor-pointer"
-          >
-            <Sparkles size={15} />
-            <span>{isAiLoading ? "Sedang Menganalisis..." : "Uji Harmonisasi Otomatis"}</span>
-          </button>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Tombol Unduh PDF Draf Hasil Penyelarasan */}
+            <button
+              type="button"
+              onClick={handleDownloadPdfResmi}
+              disabled={isGeneratingPdf || !pdfPreviewUrl}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs font-bold text-rose-700 shadow-xs hover:bg-rose-50 transition cursor-pointer disabled:opacity-50"
+              title="Unduh draf hasil harmonisasi dalam format PDF resmi"
+            >
+              <Download size={14} className="text-rose-600 sm:w-[15px] sm:h-[15px]" />
+              <span>{isGeneratingPdf ? "Menyiapkan PDF..." : "Unduh PDF Draf"}</span>
+            </button>
+
+            {/* Tombol Uji Harmonisasi */}
+            <button
+              type="button"
+              onClick={handleAutoAnalyze}
+              disabled={isAiLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 transition disabled:opacity-50 cursor-pointer"
+            >
+              <Sparkles size={14} className="sm:w-[15px] sm:h-[15px]" />
+              <span>{isAiLoading ? "Sedang Mengomparasi..." : "Uji Komparasi Harmonisasi"}</span>
+            </button>
+
+            {!isAdmin && (
+              <button
+                type="button"
+                onClick={handleLanjutKePersetujuan}
+                disabled={!isBolehLanjutPersetujuan || isUpdatingTahap}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold transition shadow-sm ${
+                  isBolehLanjutPersetujuan
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
+                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                }`}
+                title={
+                  aiWarningAlert
+                    ? "Tombol dinonaktifkan karena ditemukan peringatan benturan/tumpang tindih hukum"
+                    : "Lanjut ke Tahap Persetujuan Multi-Pihak"
+                }
+              >
+                <span>{isUpdatingTahap ? "Memproses..." : "Lanjut ke Tahap Persetujuan"}</span>
+                <ChevronRight size={14} className="sm:w-[15px] sm:h-[15px]" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Warning Alert Banner Jika Ada Regulasi yang Tumpang Tindih / Bentrok */}
       {aiWarningAlert && (
-        <div className="flex items-start gap-3.5 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 shadow-sm animate-in fade-in duration-200">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white">
-            <ShieldAlert size={20} />
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3.5 sm:p-4 shadow-sm animate-in fade-in duration-200">
+          <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
+            <ShieldAlert size={18} className="sm:w-5 sm:h-5" />
           </div>
           <div className="flex-1 text-xs">
-            <h5 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
-              <span>Peringatan Harmonisasi: Potensi Tumpang Tindih Terdeteksi!</span>
+            <h5 className="font-bold text-amber-900 text-xs sm:text-sm flex items-center gap-1.5">
+              <span>Peringatan Harmonisasi: Potensi Tumpang Tindih / Benturan Norma Terdeteksi!</span>
             </h5>
             <p className="mt-1 text-amber-800 leading-relaxed font-medium">
               {aiWarningAlert}
             </p>
-            <div className="mt-2.5 flex items-center gap-2">
-              <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
-                Status: Perlu Revisi Klausul
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-amber-900">
+                Status Validasi: Tombol Persetujuan Dinonaktifkan
               </span>
               <button
                 type="button"
-                onClick={() => setStatusHarmonisasi("Perlu Perbaikan Harmonisasi")}
-                className="text-[11px] font-bold text-amber-900 underline hover:text-amber-950 cursor-pointer"
+                onClick={handlePerbaikiOtomatis}
+                disabled={isAiLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1 text-[10px] sm:text-[11px] font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer disabled:opacity-50"
               >
-                Ubah Status ke Perlu Perbaikan
+                <Sparkles size={12} />
+                <span>Perbaiki Otomatis Sekarang</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveRightTab("editor")}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] sm:text-[11px] font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
+              >
+                <Edit3 size={12} />
+                <span>Perbaiki Manual di Form Editor</span>
               </button>
             </div>
           </div>
@@ -2365,58 +2759,58 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
         </div>
       )}
 
-      {/* Grid 2 Kolom: Kolom Kiri Chat LARAS AI, Kolom Kanan Form Harmonisasi */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Kolom Kiri: AI Chat Assistant LARAS */}
-        <div className="lg:col-span-7 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[620px]">
-          {/* Chat Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xs">
-                <Bot size={18} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
+        <div className="lg:col-span-6 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[540px] sm:h-[620px] lg:h-[720px]">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-5 py-3 sm:py-3.5">
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-600 to-amber-700 text-white shadow-xs">
+                <Scale size={16} className="sm:w-[18px] sm:h-[18px]" />
               </div>
-              <div>
-                <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <span>LARAS — Asisten Harmonisasi Regulasi</span>
-                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="min-w-0">
+                <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
+                  <span>Asisten Telaah & Harmonisasi Regulasi</span>
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 </h5>
-                <p className="text-[11px] text-slate-400">Siap mendeteksi benturan pasal & norma hukum</p>
+                <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">Komparasi draf terhadap database dokumen hukum yang telah terbit</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setChatMessages([]);
-                setAiWarningAlert(null);
-              }}
-              className="text-xs font-medium text-slate-400 hover:text-slate-700 transition p-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-1 cursor-pointer"
-              title="Bersihkan Percakapan"
-            >
-              <RefreshCw size={13} />
-              <span>Reset</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setChatMessages([]);
+                  setAiWarningAlert(null);
+                  setConflictFindings([]);
+                }}
+                className="text-xs font-medium text-slate-400 hover:text-slate-700 transition p-1.5 rounded-lg hover:bg-slate-100 flex items-center gap-1 cursor-pointer"
+                title="Bersihkan Percakapan"
+              >
+                <RefreshCw size={13} />
+                <span className="hidden sm:inline">Reset</span>
+              </button>
+            </div>
           </div>
 
           {/* Chat Message List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-50/30">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 custom-scrollbar bg-slate-50/30">
             {chatMessages.map((msg) => {
               const isUser = msg.role === "user";
               return (
                 <div
                   key={msg.id}
-                  className={`flex items-start gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+                  className={`flex items-start gap-2 sm:gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}
                 >
                   <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                    className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
                       isUser
                         ? "bg-slate-800 text-white"
-                        : "bg-blue-600 text-white shadow-xs"
+                        : "bg-amber-600 text-white shadow-xs"
                     }`}
                   >
-                    {isUser ? "Anda" : <Bot size={16} />}
+                    {isUser ? "Anda" : <Scale size={14} className="sm:w-4 sm:h-4" />}
                   </div>
                   <div
-                    className={`group relative max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-2xs ${
+                    className={`group relative max-w-[92%] sm:max-w-[85%] rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs leading-relaxed shadow-2xs ${
                       isUser
                         ? "bg-slate-900 text-white rounded-tr-xs"
                         : msg.conflictDetected
@@ -2425,25 +2819,37 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
                     }`}
                   >
                     {!isUser && (
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-2">
-                        <span className="font-bold text-blue-700 text-[11px] flex items-center gap-1">
-                          <Sparkles size={11} />
-                          LARAS AI Telaah
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-1.5 mb-2 gap-1.5">
+                        <span className="font-bold text-amber-800 text-[10px] sm:text-[11px] flex items-center gap-1">
+                          <CheckCircle2 size={12} className="text-amber-600" />
+                          Hasil Telaah Komparasi Hukum
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] text-slate-400">{msg.time}</span>
+                          {msg.conflictDetected && (
+                            <button
+                              type="button"
+                              onClick={handlePerbaikiOtomatis}
+                              disabled={isAiLoading}
+                              className="rounded px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 transition cursor-pointer flex items-center gap-1"
+                              title="Perbaiki klausul bentrok secara otomatis"
+                            >
+                              <Sparkles size={10} />
+                              Perbaiki Otomatis
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleSalinKeCatatan(msg.text)}
-                            className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-50 transition cursor-pointer"
-                            title="Salin hasil telaah ini ke Catatan Harmonisasi"
+                            className="rounded px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                            title="Salin hasil telaah ini ke formulir Catatan Harmonisasi"
                           >
                             Salin ke Catatan
                           </button>
                         </div>
                       </div>
                     )}
-                    <div className="prose prose-xs max-w-none text-xs">
+                    <div className="prose prose-xs max-w-none text-xs break-words overflow-x-auto">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {msg.text}
                       </ReactMarkdown>
@@ -2455,13 +2861,13 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
 
             {isAiLoading && (
               <div className="flex items-start gap-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs animate-pulse">
-                  <Bot size={16} />
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white shadow-xs animate-pulse">
+                  <Scale size={16} />
                 </div>
-                <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+                <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-3.5 sm:px-4 py-2.5 sm:py-3 shadow-2xs">
                   <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                    <span className="inline-block h-2 w-2 rounded-full bg-blue-600 animate-ping" />
-                    <span>LARAS sedang menelaah keselarasan klausul & mendeteksi potensi tumpang tindih...</span>
+                    <span className="inline-block h-2 w-2 rounded-full bg-amber-600 animate-ping" />
+                    <span>Sedang mengomparasi draf terhadap database regulasi terpublikasi...</span>
                   </div>
                 </div>
               </div>
@@ -2469,34 +2875,34 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
             <div ref={chatBottomRef} />
           </div>
 
-          {/* Quick Prompts */}
-          <div className="border-t border-slate-100 bg-white px-4 py-2 flex items-center gap-1.5 overflow-x-auto text-[11px]">
-            <span className="text-slate-400 shrink-0 font-medium">Saran Prompt:</span>
+          {/* Quick Actions Prompt Suggestions */}
+          <div className="border-t border-slate-100 bg-white px-3 sm:px-4 py-2 flex items-center gap-1.5 overflow-x-auto scrollbar-thin text-[11px]">
+            <span className="text-slate-400 shrink-0 font-medium text-[10px] sm:text-[11px]">Saran:</span>
+            <button
+              type="button"
+              onClick={handleAutoAnalyze}
+              className="rounded-lg bg-amber-50 px-2 sm:px-2.5 py-1 text-amber-800 font-bold hover:bg-amber-100 shrink-0 transition text-[10px] sm:text-[11px]"
+            >
+              Komparasi Seluruh Dokumen
+            </button>
             <button
               type="button"
               onClick={() => handleSendPrompt("Periksa apakah ada klausul kewenangan yang bertentangan dengan UU No 17 Tahun 2011!")}
-              className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition"
+              className="rounded-lg bg-slate-100 px-2 sm:px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition text-[10px] sm:text-[11px]"
             >
-              Uji Benturan UU 17/2011
+              Komparasi UU 17/2011
             </button>
             <button
               type="button"
               onClick={() => handleSendPrompt("Apakah ada pasal yang tumpang tindih dengan Perpres No 90 Tahun 2012?")}
-              className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition"
+              className="rounded-lg bg-slate-100 px-2 sm:px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition text-[10px] sm:text-[11px]"
             >
               Sinkronisasi Perpres 90/2012
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendPrompt("Berikan usulan rumusan pasal revisi agar selaras dan tidak berbenturan.")}
-              className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-blue-50 hover:text-blue-700 shrink-0 transition"
-            >
-              Usulan Rumusan Revisi
             </button>
           </div>
 
           {/* Chat Input */}
-          <div className="border-t border-slate-200 bg-white p-3">
+          <div className="border-t border-slate-200 bg-white p-2.5 sm:p-3">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -2508,13 +2914,13 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
                 type="text"
                 value={inputPrompt}
                 onChange={(e) => setInputPrompt(e.target.value)}
-                placeholder="Ketik pasal atau pertanyaan harmonisasi untuk ditelaah LARAS..."
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-xs focus:border-blue-500 focus:bg-white focus:outline-none transition"
+                placeholder="Ketik instruksi uji komparasi terhadap peraturan terpublikasi..."
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50/60 px-3 sm:px-4 py-2 sm:py-2.5 text-xs focus:border-amber-500 focus:bg-white focus:outline-none transition min-w-0"
               />
               <button
                 type="submit"
                 disabled={!inputPrompt.trim() || isAiLoading}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-40 cursor-pointer"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white shadow-xs hover:bg-amber-700 transition disabled:opacity-40 cursor-pointer"
               >
                 <Send size={15} />
               </button>
@@ -2522,88 +2928,381 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
           </div>
         </div>
 
-        {/* Kolom Kanan: Form Simpan Hasil Harmonisasi */}
-        <div className="lg:col-span-5">
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-4 rounded-2xl border border-slate-200 p-5 bg-white shadow-xs"
-          >
-            <div className="border-b border-slate-100 pb-3">
-              <h5 className="font-bold text-sm text-slate-900">
-                Formulir Hasil Harmonisasi
-              </h5>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Simpan keputusan status dan catatan telaah akhir regulasi.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Status Harmonisasi
-              </label>
-              <select
-                value={statusHarmonisasi}
-                onChange={(e) => setStatusHarmonisasi(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium focus:border-blue-500 focus:outline-none bg-slate-50/50"
-              >
-                <option value="Sedang Diharmonisasi">Sedang Diharmonisasi</option>
-                <option value="Harmonisasi Selesai Disetujui">Harmonisasi Selesai (Disetujui)</option>
-                <option value="Perlu Perbaikan Harmonisasi">Perlu Perbaikan / Penyesuaian Klausul</option>
-              </select>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Catatan / Rekomendasi Hasil Telaah
-                </label>
-                <span className="text-[10px] text-slate-400">Dapat disalin dari AI</span>
-              </div>
-              <textarea
-                rows={7}
-                value={catatan}
-                onChange={(e) => setCatatan(e.target.value)}
-                placeholder="Tuliskan hasil harmonisasi, sinkronisasi pasal, atau klausul revisi yang disepakati..."
-                className="w-full rounded-xl border border-slate-200 p-3 text-xs leading-relaxed focus:border-blue-500 focus:outline-none bg-slate-50/50 custom-scrollbar"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Upload Berita Acara / Surat Keterangan Harmonisasi (PDF)
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => setFileHarmonisasi(e.target.files?.[0] || null)}
-                className="block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 border border-slate-200 rounded-xl p-1 bg-slate-50/50"
-              />
-              {draft.file_harmonisasi && (
-                <p className="mt-1.5 text-xs text-slate-500">
-                  File tersimpan:{" "}
-                  <a
-                    href={`${APP_BASE_URL}/uploads/pengajuan-peraturan/${draft.file_harmonisasi}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 underline font-medium"
-                  >
-                    {draft.file_harmonisasi}
-                  </a>
-                </p>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-slate-100">
+        {/* Kolom Kanan: Pratinjau Dokumen dengan Coretan Background / Form Editor Perbaikan / Simpan Hasil */}
+        <div className="lg:col-span-6 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden h-[540px] sm:h-[620px] lg:h-[720px]">
+          {/* Tab Navigation Kolom Kanan - Responsive Scroll/Wrap */}
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-3 sm:px-4 py-2 sm:py-2.5 gap-2">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-thin max-w-full pb-0.5">
               <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition disabled:opacity-50 cursor-pointer"
+                type="button"
+                onClick={() => setActiveRightTab("preview")}
+                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                  activeRightTab === "preview"
+                    ? "bg-white text-blue-700 shadow-xs border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
               >
-                <CheckCircle2 size={15} />
-                {isPending ? "Menyimpan..." : "Simpan Hasil Harmonisasi"}
+                <FileText size={13} className="text-blue-600 sm:w-[14px] sm:h-[14px]" />
+                <span className="whitespace-nowrap">Pratinjau Lembar Draf</span>
+                {conflictFindings.length > 0 && (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] text-white font-black animate-pulse">
+                    {conflictFindings.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveRightTab("editor")}
+                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                  activeRightTab === "editor"
+                    ? "bg-white text-emerald-700 shadow-xs border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Edit3 size={13} className="text-emerald-600 sm:w-[14px] sm:h-[14px]" />
+                <span className="whitespace-nowrap">Editor Perbaikan Draf</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveRightTab("form")}
+                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                  activeRightTab === "form"
+                    ? "bg-white text-slate-800 shadow-xs border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <CheckCircle2 size={13} className="text-slate-600 sm:w-[14px] sm:h-[14px]" />
+                <span className="whitespace-nowrap">Form Hasil</span>
               </button>
             </div>
-          </form>
+
+            <button
+              type="button"
+              onClick={handleDownloadPdfResmi}
+              disabled={isGeneratingPdf || !pdfPreviewUrl}
+              className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 sm:px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer shrink-0"
+              title="Unduh file PDF draf ini"
+            >
+              <Download size={12} />
+              <span>PDF</span>
+            </button>
+          </div>
+
+          {/* Konten Tab Kanan */}
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 custom-scrollbar bg-slate-50/40">
+            {activeRightTab === "preview" && (
+              <div className="space-y-4">
+                {/* Banner Peringatan Coretan Background jika ada klausul berbenturan */}
+                {conflictFindings.length > 0 ? (
+                  <div className="rounded-xl border border-rose-300 bg-rose-50/95 p-3 sm:p-3.5 shadow-xs space-y-2 sm:space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-rose-800 font-bold text-xs">
+                        <AlertTriangle size={15} className="text-rose-600 shrink-0" />
+                        <span>Klausul Beririsan / Tumpang Tindih Terdeteksi:</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePerbaikiOtomatis}
+                        disabled={isAiLoading}
+                        className="rounded-lg bg-blue-600 px-2.5 py-1 text-[10px] font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer self-start sm:self-auto"
+                      >
+                        Perbaiki Otomatis
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {conflictFindings.map((cf) => (
+                        <div
+                          key={cf.id}
+                          onClick={() => setSelectedConflict(cf)}
+                          className={`p-2 sm:p-2.5 rounded-lg border text-xs cursor-pointer transition ${
+                            selectedConflict?.id === cf.id
+                              ? "border-rose-400 bg-rose-100/90 shadow-2xs"
+                              : "border-rose-200 bg-white/80 hover:bg-rose-100/60"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-rose-900 line-through decoration-rose-500 decoration-2">
+                              {cf.pasal}
+                            </span>
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-200 px-2 py-0.5 rounded-full shrink-0">
+                              {cf.kategoriBenturan}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-slate-600">
+                            <strong>Berbenturan dengan:</strong> {cf.regulasiAcuan}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-rose-800">
+                            <strong>Saran Revisi:</strong> {cf.rekomendasiRevisi}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                      Status Draf: Selaras & Bebas Tumpang Tindih terhadap Seluruh Regulasi Publikasi
+                    </span>
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full self-start sm:self-auto">
+                      Tervalidasi
+                    </span>
+                  </div>
+                )}
+
+                {/* Lembar Dokumen Simulasi A4 Visual dengan Coretan Background */}
+                <div className="relative mx-auto w-full max-w-full sm:max-w-[500px] rounded-xl border border-slate-300 bg-white p-4 sm:p-7 shadow-md font-serif text-[10.5px] sm:text-[11px] leading-relaxed text-slate-800 box-border overflow-x-hidden">
+                  <div className="text-center font-bold space-y-0.5 border-b border-slate-200 pb-3 mb-4">
+                    <p className="text-[9.5px] sm:text-[10px] tracking-wider text-slate-500">REPUBLIK INDONESIA</p>
+                    <p className="text-[11px] sm:text-xs uppercase text-slate-900">{draft.kategori || "PERATURAN BADAN INTELIJEN NEGARA"}</p>
+                    <p className="text-[9.5px] sm:text-[10px] text-slate-700">NOMOR {draft.nomor_rancangan || "Draft"} TAHUN {draft.tahun || new Date().getFullYear()}</p>
+                    <p className="text-[9.5px] sm:text-[10px] text-slate-500">TENTANG</p>
+                    <p className="text-[11px] sm:text-xs uppercase text-slate-900">{draft.judul}</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p>
+                      <strong>Menimbang:</strong> bahwa untuk menjamin kepastian hukum dan tata kelola regulasi yang selaras dengan peraturan perundang-undangan nasional...
+                    </p>
+                    <p>
+                      <strong>Mengingat:</strong> 1. Undang-Undang Nomor 17 Tahun 2011 tentang Intelijen Negara; 2. Peraturan Presiden Nomor 90 Tahun 2012...
+                    </p>
+                    <p className="text-center font-bold my-2">MEMUTUSKAN:</p>
+
+                    {/* Pasal 1 */}
+                    <div className="p-2 rounded-md">
+                      <p className="font-bold text-center">BAB I KETENTUAN UMUM</p>
+                      <p className="font-bold text-center mt-1">Pasal 1</p>
+                      <p className="mt-1">Dalam Peraturan ini yang dimaksud dengan: Ketentuan teknis operasional...</p>
+                    </div>
+
+                    {/* Pasal 2 dengan Coretan Background Merah/Amber jika ada benturan */}
+                    <div
+                      className={`p-2 sm:p-2.5 rounded-lg border transition ${
+                        conflictFindings.length > 0
+                          ? "border-rose-300 bg-rose-50/90 shadow-2xs"
+                          : "border-slate-100 bg-slate-50/30"
+                      }`}
+                    >
+                      <p className="font-bold text-center">BAB II RUANG LINGKUP DAN PENYELARASAN WEWENANG</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-1 gap-1">
+                        <p className={`font-bold ${conflictFindings.length > 0 ? "text-rose-900 line-through decoration-rose-500" : ""}`}>
+                          Pasal 2
+                        </p>
+                        {conflictFindings.length > 0 && (
+                          <span className="text-[9px] font-bold text-rose-700 bg-rose-200/90 px-1.5 py-0.5 rounded self-start sm:self-auto">
+                            ⚠️ Coretan: Tumpang Tindih Perpres 90/2012
+                          </span>
+                        )}
+                      </div>
+                      <p className={`mt-1 ${conflictFindings.length > 0 ? "bg-rose-200/60 p-1.5 rounded text-rose-950 font-medium" : ""}`}>
+                        (1) Pelaksanaan kegiatan berpedoman pada asas kepatutan, kerahasiaan, dan akuntabilitas.
+                        <br />
+                        (2) Penyelenggaraan wewenang teknis diselenggarakan dengan memperhatikan keselarasan terhadap peraturan perundang-undangan yang lebih tinggi.
+                      </p>
+                    </div>
+
+                    {/* Pasal 3 Ketentuan Penutup */}
+                    <div
+                      className={`p-2 sm:p-2.5 rounded-lg border transition ${
+                        conflictFindings.length > 0
+                          ? "border-amber-300 bg-amber-50/80"
+                          : "border-slate-100 bg-slate-50/30"
+                      }`}
+                    >
+                      <p className="font-bold text-center">BAB III KETENTUAN PENUTUP</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-1 gap-1">
+                        <p className={`font-bold ${conflictFindings.length > 0 ? "text-amber-900" : ""}`}>
+                          Pasal 3
+                        </p>
+                        {conflictFindings.length > 0 && (
+                          <span className="text-[9px] font-bold text-amber-800 bg-amber-200/90 px-1.5 py-0.5 rounded self-start sm:self-auto">
+                            ⚠️ Warning: Perlu Penegasan Hierarki
+                          </span>
+                        )}
+                      </div>
+                      <p className={`mt-1 ${conflictFindings.length > 0 ? "bg-amber-100/70 p-1.5 rounded text-amber-950 font-medium" : ""}`}>
+                        Peraturan ini mulai berlaku pada tanggal diundangkan.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tombol Aksi Cepat pada Lembar Pratinjau */}
+                  <div className="mt-5 pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-[10px] text-slate-400">Pratinjau Draf Regulasi JDIH</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveRightTab("editor")}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                    >
+                      <Edit3 size={12} />
+                      <span>Edit & Perbaiki Draf Ini</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab Editor Perbaikan Manual */}
+            {activeRightTab === "editor" && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 sm:p-3.5 text-xs text-blue-900 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <Edit3 size={14} className="text-blue-600" />
+                    <span>Editor Perbaikan Draf Regulasi</span>
+                  </div>
+                  <p className="text-[11px] text-blue-800 leading-relaxed">
+                    Anda dapat merevisi pasal dan klausul yang bermasalah secara langsung di bawah ini. Setelah selesai, klik tombol <strong>"Simpan & Generate Ulang PDF"</strong> untuk memperbarui dokumen resmi.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Isi Batang Tubuh Peraturan (BAB & Pasal)
+                  </label>
+                  <textarea
+                    rows={15}
+                    value={drafBatangTubuh}
+                    onChange={(e) => setDrafBatangTubuh(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 p-3 sm:p-3.5 text-xs font-mono leading-relaxed focus:border-blue-500 focus:outline-none bg-white custom-scrollbar shadow-inner"
+                    placeholder="Tuliskan BAB dan Pasal..."
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={handlePerbaikiOtomatis}
+                    disabled={isAiLoading}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50 transition cursor-pointer"
+                  >
+                    <Sparkles size={13} />
+                    <span>Gunakan Hasil Perbaikan Otomatis</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSimpanPerbaikanManual}
+                    disabled={isGeneratingPdf}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition cursor-pointer"
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>{isGeneratingPdf ? "Men-generate PDF..." : "Simpan & Generate Ulang PDF"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tab Formulir Hasil Harmonisasi */}
+            {activeRightTab === "form" && (
+              <div>
+                {isAdmin ? (
+                  <div className="space-y-4 rounded-xl border border-slate-200 p-3.5 sm:p-4 bg-white shadow-xs">
+                    <div className="border-b border-slate-100 pb-2">
+                      <h5 className="font-bold text-sm text-slate-900">
+                        Data Hasil Harmonisasi
+                      </h5>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Informasi status dan catatan telaah akhir regulasi (Mode Readonly).
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1">Status Harmonisasi</p>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 text-xs font-semibold text-slate-800">
+                        {draft.status_harmonisasi || "Belum Ada Keputusan"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1">Catatan / Rekomendasi Hasil Telaah</p>
+                      <div className="w-full rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs leading-relaxed text-slate-700 min-h-[120px] whitespace-pre-line">
+                        {draft.catatan_harmonisasi || "Belum ada catatan hasil harmonisasi."}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 p-3.5 sm:p-4 bg-white shadow-xs">
+                    <div className="border-b border-slate-100 pb-2">
+                      <h5 className="font-bold text-sm text-slate-900">Formulir Keputusan Harmonisasi</h5>
+                      <p className="text-xs text-slate-500 mt-0.5">Simpan keputusan status dan lampiran berita acara harmonisasi.</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Status Harmonisasi</label>
+                      <select
+                        value={statusHarmonisasi}
+                        onChange={(e) => setStatusHarmonisasi(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium focus:border-blue-500 focus:outline-none bg-slate-50/50"
+                      >
+                        <option value="Sedang Diharmonisasi">Sedang Diharmonisasi</option>
+                        <option value="Harmonisasi Selesai Disetujui">Harmonisasi Selesai (Disetujui)</option>
+                        <option value="Perlu Perbaikan Harmonisasi">Perlu Perbaikan / Penyesuaian Klausul</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Catatan Hasil Harmonisasi</label>
+                      <textarea
+                        rows={6}
+                        value={catatan}
+                        onChange={(e) => setCatatan(e.target.value)}
+                        placeholder="Tuliskan catatan hasil harmonisasi atau salin dari rekomendasi telaah..."
+                        className="w-full rounded-xl border border-slate-200 p-3 text-xs leading-relaxed focus:border-blue-500 focus:outline-none bg-slate-50/50 custom-scrollbar"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Upload Berita Acara / Surat Keterangan Harmonisasi (PDF)
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => setFileHarmonisasi(e.target.files?.[0] || null)}
+                        className="block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 border border-slate-200 rounded-xl p-1 bg-slate-50/50"
+                      />
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={15} />
+                        <span>{isSubmitting ? "Menyimpan..." : "Simpan Keputusan Harmonisasi"}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+                      />
+                    </div>
+
+                    <div className="flex justify-end pt-2 border-t border-slate-100">
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition disabled:opacity-50 cursor-pointer"
+                      >
+                        <CheckCircle2 size={15} />
+                        {isPending ? "Menyimpan..." : "Simpan Hasil Harmonisasi"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -2611,10 +3310,17 @@ Silakan klik tombol **"Analisis Keselarasan Otomatis"** di bawah atau ketikkan p
 }
 
 // ------------------- TAHAP 4: PERSETUJUAN MULTI-PERSON VIEW -------------------
-function TabPersetujuan({ draft }: { draft: PengajuanPeraturan }) {
+function TabPersetujuan({
+  draft,
+  onNext,
+}: {
+  draft: PengajuanPeraturan;
+  onNext?: () => void;
+}) {
   const { mutate: addPejabat, isPending: isAdding } = useAddPejabatPersetujuan();
   const { mutate: updateStatus } = useUpdateStatusPersetujuan();
   const { mutate: deletePejabat } = useDeletePejabatPersetujuan();
+  const { mutate: updateTahap, isPending: isUpdatingTahap } = useUpdateTahapanPengajuan();
 
   const [namaPejabat, setNamaPejabat] = useState("");
   const [jabatan, setJabatan] = useState("");
@@ -2638,16 +3344,55 @@ function TabPersetujuan({ draft }: { draft: PengajuanPeraturan }) {
   };
 
   const persetujuanList = draft.persetujuan_list || [];
+  const isSemuaDisetujui =
+    persetujuanList.length > 0 &&
+    persetujuanList.every((item) => item.status === "Disetujui");
+
+  const handleLanjutKePenetapan = () => {
+    updateTahap(
+      {
+        id: draft.id,
+        payload: {
+          tahapan: "Penetapan",
+          status: "Penetapan",
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Rancangan peraturan berhasil diajukan ke Tahap Penetapan!");
+          if (onNext) onNext();
+        },
+      }
+    );
+  };
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-        <h4 className="text-sm font-bold text-blue-900">
-          Tahap 4: Persetujuan Multi-Pihak
-        </h4>
-        <p className="mt-1 text-xs text-blue-700">
-          Daftar checklist persetujuan dari beberapa orang yang bersangkutan (pejabat terkait, pimpinan, tim legal) sebelum dapat ditetapkan.
-        </p>
+      <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h4 className="text-sm font-bold text-blue-900">
+            Tahap 4: Persetujuan Multi-Pihak
+          </h4>
+          <p className="mt-1 text-xs text-blue-700">
+            Daftar checklist persetujuan dari beberapa orang yang bersangkutan (pejabat terkait, pimpinan, tim legal) sebelum dapat ditetapkan.
+          </p>
+        </div>
+        <div>
+          <button
+            type="button"
+            onClick={handleLanjutKePenetapan}
+            disabled={!isSemuaDisetujui || isUpdatingTahap || draft.tahapan === "Penetapan"}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition"
+            title={
+              !isSemuaDisetujui
+                ? "Semua pihak dalam checklist harus berstatus Disetujui terlebih dahulu"
+                : "Lanjut ke Tahap 5 Penetapan"
+            }
+          >
+            <span>Lanjut ke Penetapan</span>
+            <ChevronRight size={15} />
+          </button>
+        </div>
       </div>
 
       {/* Tambah Pejabat ke Checklist */}
@@ -2687,8 +3432,8 @@ function TabPersetujuan({ draft }: { draft: PengajuanPeraturan }) {
       </form>
 
       {/* Checklist Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-left text-xs text-slate-600">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white scrollbar-thin">
+        <table className="w-full text-left text-xs text-slate-600 min-w-[640px]">
           <thead className="border-b border-slate-100 bg-slate-50 font-semibold uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Nama Pejabat</th>

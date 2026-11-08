@@ -63,14 +63,18 @@ export default function DokumenHukumForm({
   const isEdit = mode === "edit";
   const formatDateInput = (value?: string | null) => {
     if (!value) return "";
-
+    if (typeof value === "string") {
+      const match = value.match(/^\d{4}-\d{2}-\d{2}/);
+      if (match) return match[0];
+    }
     const date = new Date(value);
-
     if (Number.isNaN(date.getTime())) {
       return "";
     }
-
-    return date.toISOString().split("T")[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
   const createDokumenHukum = useCreateDokumenHukum();
@@ -228,11 +232,11 @@ export default function DokumenHukumForm({
 
       tempat_penetapan: data.tempat_penetapan ?? rawData.tempat_penetapan ?? rawData.pemrakarsa ?? "",
 
-      tanggal_penetapan: formatDateInput(data.tanggal_penetapan || rawData.tanggal_pengajuan) ?? "",
+      tanggal_penetapan: formatDateInput(data.tanggal_penetapan || rawData.tanggal_penetapan || rawData.target_penetapan || rawData.tanggal_pengajuan) ?? "",
 
-      tanggal_pengundangan: formatDateInput(data.tanggal_pengundangan || rawData.tanggal_pengajuan) ?? "",
+      tanggal_pengundangan: formatDateInput(data.tanggal_pengundangan || rawData.tanggal_pengundangan || rawData.tanggal_pengajuan) ?? "",
 
-      tanggal_berlaku: formatDateInput(data.tanggal_berlaku || rawData.target_penetapan) ?? "",
+      tanggal_berlaku: formatDateInput(data.tanggal_berlaku || rawData.tanggal_berlaku || rawData.target_penetapan) ?? "",
 
       sumber: extractedSumber,
       pemrakarsa: rawData.pemrakarsa ?? "",
@@ -327,6 +331,9 @@ export default function DokumenHukumForm({
         pengajuanFormData.append("tahun", String(values.tahun));
         pengajuanFormData.append("pemrakarsa", values.pemrakarsa?.trim() || values.tempat_penetapan?.trim() || "Biro Hukum");
         pengajuanFormData.append("penanggung_jawab", values.penanggung_jawab?.trim() || "Biro Hukum");
+        pengajuanFormData.append("tanggal_penetapan", values.tanggal_penetapan || "");
+        pengajuanFormData.append("tanggal_pengundangan", values.tanggal_pengundangan || "");
+        pengajuanFormData.append("tanggal_berlaku", values.tanggal_berlaku || "");
         pengajuanFormData.append("tanggal_pengajuan", values.tanggal_pengundangan || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
         pengajuanFormData.append("target_penetapan", values.tanggal_berlaku || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
         pengajuanFormData.append(
@@ -403,6 +410,9 @@ export default function DokumenHukumForm({
       pengajuanFormData.append("tahun", String(values.tahun));
       pengajuanFormData.append("pemrakarsa", values.pemrakarsa?.trim() || values.tempat_penetapan?.trim() || "Biro Hukum");
       pengajuanFormData.append("penanggung_jawab", values.penanggung_jawab?.trim() || "Biro Hukum");
+      pengajuanFormData.append("tanggal_penetapan", values.tanggal_penetapan || "");
+      pengajuanFormData.append("tanggal_pengundangan", values.tanggal_pengundangan || "");
+      pengajuanFormData.append("tanggal_berlaku", values.tanggal_berlaku || "");
       pengajuanFormData.append("tanggal_pengajuan", values.tanggal_pengundangan || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
       pengajuanFormData.append("target_penetapan", values.tanggal_berlaku || values.tanggal_penetapan || new Date().toISOString().split("T")[0]);
       pengajuanFormData.append(

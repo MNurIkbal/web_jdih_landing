@@ -111,11 +111,34 @@ export const VerifikasiPengajuanSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["catatan"],
-      message: "Catatan penolakan / revisi wajib diisi jika permohonan ditolak",
+      message: "Catatan penolakan wajib diisi jika permohonan ditolak",
     });
   }
 });
 
 export type VerifikasiPengajuanFormValues = z.infer<typeof VerifikasiPengajuanSchema>;
+
+export const PembahasanRapatSchema = z.object({
+  judul_rapat: z
+    .string({ required_error: "Judul rapat / agenda wajib diisi" })
+    .trim()
+    .min(1, "Judul rapat / agenda wajib diisi")
+    .max(255, "Judul rapat maksimal 255 karakter"),
+  tanggal_rapat: z
+    .string({ required_error: "Tanggal rapat wajib diisi" })
+    .min(1, "Tanggal rapat wajib diisi"),
+  lokasi: z.string().trim().max(255, "Lokasi maksimal 255 karakter").optional(),
+  keterangan: z.string().trim().optional(),
+  file_notulensi: z
+    .any()
+    .refine((file) => file !== null && file !== undefined, "File notulensi / berita acara wajib diunggah")
+    .refine((file) => !(file instanceof File) || file.size <= 30 * 1024 * 1024, "Ukuran file notulensi maksimal 30 MB")
+    .refine(
+      (file) => !(file instanceof File) || file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
+      "Format file notulensi harus berformat PDF"
+    ),
+});
+
+export type PembahasanRapatFormValues = z.infer<typeof PembahasanRapatSchema>;
 
 

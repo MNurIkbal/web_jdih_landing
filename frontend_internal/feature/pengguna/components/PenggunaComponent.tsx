@@ -9,7 +9,7 @@ import {
 } from "next/navigation";
 
 import Image from "next/image";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, MoreVertical, Pencil, Trash2, Shield } from "lucide-react";
 
 import DataTable, {
   type DataTableColumn,
@@ -69,6 +69,9 @@ function PenggunaContent() {
 
   const [deleteData, setDeleteData] =
     useState<Pengguna | null>(null);
+
+  const [openDropdownId, setOpenDropdownId] =
+    useState<number | null>(null);
 
   // ============================================================
   // URL PARAMETER
@@ -347,6 +350,103 @@ function PenggunaContent() {
         key: "role",
         label: "Role",
         sortable: true,
+        render: (value) => {
+          const roleStr = String(value || "pengguna").toLowerCase();
+          const badgeConfig: Record<string, { bg: string; text: string; border: string; label: string }> = {
+            superadmin: {
+              bg: "bg-purple-50",
+              text: "text-purple-700",
+              border: "border-purple-200",
+              label: "Superadmin",
+            },
+            admin: {
+              bg: "bg-blue-50",
+              text: "text-blue-700",
+              border: "border-blue-200",
+              label: "Admin Verifikator",
+            },
+            pengguna: {
+              bg: "bg-emerald-50",
+              text: "text-emerald-700",
+              border: "border-emerald-200",
+              label: "Pengguna",
+            },
+          };
+
+          const current = badgeConfig[roleStr] || {
+            bg: "bg-slate-50",
+            text: "text-slate-700",
+            border: "border-slate-200",
+            label: String(value || "-"),
+          };
+
+          return (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${current.bg} ${current.text} ${current.border}`}
+            >
+              <Shield size={12} className="opacity-80" />
+              {current.label}
+            </span>
+          );
+        },
+      },
+      {
+        key: "aksi",
+        label: "Aksi",
+        width: "90px",
+        align: "center",
+        render: (_val, row) => {
+          const isOpen = openDropdownId === row.id;
+
+          return (
+            <div className="relative inline-block text-left">
+              <button
+                type="button"
+                onClick={() =>
+                  setOpenDropdownId(isOpen ? null : row.id)
+                }
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition shadow-xs cursor-pointer"
+                title="Pilihan Aksi"
+              >
+                <MoreVertical size={16} />
+              </button>
+
+              {isOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setOpenDropdownId(null)}
+                  />
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-36 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenDropdownId(null);
+                        handleEdit(row);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition cursor-pointer"
+                    >
+                      <Pencil size={14} className="text-emerald-600" />
+                      <span>Edit</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenDropdownId(null);
+                        handleDelete(row);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700 transition cursor-pointer"
+                    >
+                      <Trash2 size={14} className="text-red-500" />
+                      <span>Hapus</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        },
       },
     ];
 
@@ -368,12 +468,6 @@ function PenggunaContent() {
           description="Kelola pengguna yang digunakan untuk mengelola website JDIH."
 
           searchPlaceholder="Cari pengguna..."
-
-          actions={{
-            view: handleView,
-            edit: handleEdit,
-            delete: handleDelete,
-          }}
 
           addButtonText="Tambah Pengguna"
 

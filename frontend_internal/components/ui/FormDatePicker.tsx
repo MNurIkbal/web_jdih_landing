@@ -46,13 +46,19 @@ export default function FormDatePicker({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Parse current value
-  const initialDate = value ? new Date(value) : new Date();
-  const [viewYear, setViewYear] = useState<number>(
-    Number.isNaN(initialDate.getTime()) ? new Date().getFullYear() : initialDate.getFullYear()
-  );
-  const [viewMonth, setViewMonth] = useState<number>(
-    Number.isNaN(initialDate.getTime()) ? new Date().getMonth() : initialDate.getMonth()
-  );
+  const parseDateString = (val?: string) => {
+    if (!val) return null;
+    const match = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (match) {
+      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const initialDate = parseDateString(value) || new Date();
+  const [viewYear, setViewYear] = useState<number>(initialDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState<number>(initialDate.getMonth());
 
   // Close when clicked outside
   useEffect(() => {
@@ -72,8 +78,8 @@ export default function FormDatePicker({
   // Update calendar view when value changes
   useEffect(() => {
     if (value) {
-      const d = new Date(value);
-      if (!Number.isNaN(d.getTime())) {
+      const d = parseDateString(value);
+      if (d) {
         setViewYear(d.getFullYear());
         setViewMonth(d.getMonth());
       }
@@ -118,8 +124,8 @@ export default function FormDatePicker({
   // Format display text
   const displayValue = value
     ? (() => {
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return value;
+        const d = parseDateString(value);
+        if (!d) return value;
         const day = d.getDate();
         const month = MONTH_NAMES[d.getMonth()];
         const year = d.getFullYear();
@@ -220,8 +226,9 @@ export default function FormDatePicker({
               const formattedDay = String(day).padStart(2, "0");
               const currentCheck = `${viewYear}-${formattedMonth}-${formattedDay}`;
               const isSelected = value === currentCheck;
+              const now = new Date();
               const isToday =
-                new Date().toISOString().split("T")[0] === currentCheck;
+                `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}` === currentCheck;
 
               return (
                 <button
@@ -247,7 +254,8 @@ export default function FormDatePicker({
             <button
               type="button"
               onClick={() => {
-                const today = new Date().toISOString().split("T")[0];
+                const now = new Date();
+                const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
                 onChange?.(today);
                 setIsOpen(false);
               }}

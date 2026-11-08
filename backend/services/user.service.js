@@ -111,11 +111,13 @@ const create = async ({
         throw new Error("Password wajib diisi");
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     const existingUser =
-        await userRepository.findByEmail(email);
+        await userRepository.findByEmail(normalizedEmail);
 
     if (existingUser) {
-        throw new Error("Email sudah digunakan");
+        throw new Error("Email sudah terdaftar. Silakan gunakan email lain.");
     }
 
     // Hash password
@@ -125,8 +127,8 @@ const create = async ({
     );
 
     return await userRepository.create({
-        nama,
-        email,
+        nama: String(nama).trim(),
+        email: normalizedEmail,
         password: hashedPassword,
         role,
         foto,
@@ -165,9 +167,11 @@ const update = async (
         );
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     const emailUser =
         await userRepository.findByEmail(
-            email
+            normalizedEmail
         );
 
     if (
@@ -175,7 +179,7 @@ const update = async (
         Number(emailUser.id) !== Number(id)
     ) {
         throw new Error(
-            "Email sudah digunakan oleh user lain"
+            "Email sudah terdaftar. Silakan gunakan email lain."
         );
     }
 
@@ -183,7 +187,7 @@ const update = async (
         id,
         {
             nama: nama.trim(),
-            email: email.trim(),
+            email: normalizedEmail,
             role: role ? String(role).trim().toLowerCase() : existingUser.role,
             foto:
                 foto ||

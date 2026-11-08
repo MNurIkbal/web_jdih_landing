@@ -1,4 +1,8 @@
-const { Pool } = require("pg");
+const { Pool, types } = require("pg");
+
+// Parse PostgreSQL DATE type (OID 1082) as plain string 'YYYY-MM-DD' apa adanya
+// Mencegah node-pg mengonversi DATE ke JavaScript Date UTC yang menggeser tanggal mundur 1 hari di zona waktu Indonesia (WIB UTC+7)
+types.setTypeParser(1082, (val) => val);
 
 const pool = new Pool({
     host: process.env.DB_HOST || "localhost",

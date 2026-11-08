@@ -29,6 +29,7 @@ export async function sendChatMessage(
   let data: ChatApiResponse
   try {
     data = await response.json()
+    console.log(data);
     
   } catch {
     throw new ChatServiceError("Respons server tidak valid", response.status)

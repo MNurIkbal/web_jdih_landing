@@ -96,13 +96,43 @@ export const addPejabatPersetujuan = async (
 
 export const updateStatusPersetujuan = async (
   persetujuanId: number,
-  payload: { status: "Menunggu" | "Disetujui" | "Ditolak"; catatan?: string }
+  payload: { status: "Menunggu" | "Disetujui" | "Ditolak"; catatan?: string; file_lampiran?: File | null } | FormData
 ) => {
+  let body = payload;
+  let headers = {};
+  if (!(payload instanceof FormData) && payload.file_lampiran) {
+    const fd = new FormData();
+    fd.append("status", payload.status);
+    if (payload.catatan) fd.append("catatan", payload.catatan);
+    fd.append("file_lampiran", payload.file_lampiran);
+    body = fd;
+    headers = { "Content-Type": "multipart/form-data" };
+  } else if (payload instanceof FormData) {
+    headers = { "Content-Type": "multipart/form-data" };
+  }
+
   const res = await api.put(
     `/pengajuan-peraturan/persetujuan/${persetujuanId}`,
-    payload
+    body,
+    { headers }
   );
   return res.data.data;
+};
+
+export const uploadRevisedDraftPdf = async (
+  draftId: number,
+  filePdf: File
+) => {
+  const formData = new FormData();
+  formData.append("file_draft", filePdf);
+  const res = await api.put(
+    `/pengajuan-peraturan/${draftId}/upload-revised-pdf`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
+  );
+  return res.data;
 };
 
 export const deletePejabatPersetujuan = async (persetujuanId: number) => {

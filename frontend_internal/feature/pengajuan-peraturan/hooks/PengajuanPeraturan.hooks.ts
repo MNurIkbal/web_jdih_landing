@@ -15,6 +15,7 @@ import {
   submitPenetapanPublikasi,
   updateStatusPersetujuan,
   updateTahapanPengajuan,
+  uploadRevisedDraftPdf,
 } from "../api/PengajuanPeraturan.service";
 
 const getErrorMessage = (error: any) => {
@@ -189,6 +190,21 @@ export const useSubmitPenetapanPublikasi = () => {
       toast.success("Peraturan berhasil ditetapkan dan dipublikasikan ke Dokumen Hukum Internal!");
       qc.invalidateQueries({ queryKey: ["PengajuanPeraturan"] });
       qc.invalidateQueries({ queryKey: ["DokumenHukum"] });
+    },
+    onError: (error: any) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+};
+
+export const useUploadRevisedDraftPdf = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, filePdf }: { draftId: number; filePdf: File }) =>
+      uploadRevisedDraftPdf(draftId, filePdf),
+    onSuccess: () => {
+      toast.success("File PDF perbaikan dokumen berhasil diunggah!");
+      qc.invalidateQueries({ queryKey: ["PengajuanPeraturan"] });
     },
     onError: (error: any) => {
       toast.error(getErrorMessage(error));

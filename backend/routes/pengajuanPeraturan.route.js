@@ -8,6 +8,12 @@ router.get("/options", pengajuanController.getOptions);
 router.get("/", pengajuanController.getAll);
 router.get("/:id", pengajuanController.getById);
 router.get("/:id/download-file/:type", pengajuanController.downloadFilePengajuan);
+router.get("/:id/extract-draft-text", pengajuanController.extractDraftPdfText);
+router.put(
+    "/:id/upload-revised-pdf",
+    upload.single("file_draft"),
+    pengajuanController.uploadRevisedPdf
+);
 
 // Tahap 1: Pengajuan Baru (Khusus role pengguna saja)
 router.post(
@@ -57,7 +63,11 @@ router.post(
 
 // Tahap 4: Persetujuan (multi-person approval checklist)
 router.post("/:id/persetujuan", pengajuanController.addPersetujuan);
-router.put("/persetujuan/:persetujuanId", pengajuanController.updatePersetujuanStatus);
+router.put(
+    "/persetujuan/:persetujuanId",
+    upload.single("file_lampiran"),
+    pengajuanController.updatePersetujuanStatus
+);
 router.delete("/persetujuan/:persetujuanId", pengajuanController.deletePersetujuan);
 
 // Tahap 5: Penetapan & Publikasi ke dokumen_hukum internal

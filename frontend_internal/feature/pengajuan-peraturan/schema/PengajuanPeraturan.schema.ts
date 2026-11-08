@@ -141,4 +141,27 @@ export const PembahasanRapatSchema = z.object({
 
 export type PembahasanRapatFormValues = z.infer<typeof PembahasanRapatSchema>;
 
+export const UploadRevisedDraftPdfSchema = z.object({
+  file_draft: z
+    .custom<File>((file) => file instanceof File, {
+      message: "Berkas PDF perbaikan wajib dipilih",
+    })
+    .refine(
+      (file) =>
+        file.type === "application/pdf" ||
+        file.name.toLowerCase().endsWith(".pdf"),
+      {
+        message: "Format berkas harus berformat PDF (.pdf)",
+      }
+    )
+    .refine(
+      (file) => file.size <= 30 * 1024 * 1024,
+      {
+        message: "Ukuran berkas PDF maksimal 30 MB",
+      }
+    ),
+});
+
+export type UploadRevisedDraftPdfFormValues = z.infer<typeof UploadRevisedDraftPdfSchema>;
+
 

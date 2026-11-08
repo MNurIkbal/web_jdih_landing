@@ -13,6 +13,7 @@ export type StatusPeraturan =
   | "Proses"
   | "Pembahasan"
   | "Harmonisasi"
+  | "Perlu Perbaikan Harmonisasi"
   | "Persetujuan"
   | "Penetapan"
   | "Revisi"
@@ -37,6 +38,7 @@ export interface PersetujuanItem {
   jabatan: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";
   catatan?: string | null;
+  file_lampiran?: string | null;
   tanggal_persetujuan?: string | null;
   created_at?: string;
 }

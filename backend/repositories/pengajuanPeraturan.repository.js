@@ -365,18 +365,40 @@ const addPersetujuanPejabat = async (draftId, data) => {
 };
 
 const updatePersetujuanStatus = async (persetujuanId, data) => {
-    const { status, catatan } = data;
+    const { status, catatan, file_lampiran } = data;
     const query = `
         UPDATE draft_peraturan_persetujuan
         SET status = $2,
             catatan = $3,
+            file_lampiran = COALESCE($4, file_lampiran),
             tanggal_persetujuan = NOW(),
             updated_at = NOW()
         WHERE id = $1
         RETURNING *;
     `;
-    const res = await pool.query(query, [persetujuanId, status, catatan || null]);
-    return res.rows[0];
+    const res = await pool.query(query, [persetujuanId, status, catatan || null, file_lampiran || null]);
+    const updatedItem = res.rows[0];
+
+    // JIKA STATUS DITOLAK: Kembalikan draft peraturan ke Tahap Harmonisasi!
+    if (status === "Ditolak" && updatedItem && updatedItem.draft_id) {
+        await pool.query(
+            `UPDATE draft_peraturan 
+             SET tahapan = 'Harmonisasi', 
+                 status = 'Perlu Perbaikan Harmonisasi',
+                 status_harmonisasi = 'Perlu Perbaikan Harmonisasi',
+                 catatan_harmonisasi = CONCAT(COALESCE(catatan_harmonisasi, ''), E'\n\n[Ditolak pada Tahap Persetujuan oleh ', $2, ' (', $3, ')]: ', $4),
+                 updated_at = NOW() 
+             WHERE id = $1`,
+            [
+                updatedItem.draft_id,
+                updatedItem.nama_pejabat,
+                updatedItem.jabatan || 'Pejabat Penyetuju',
+                catatan || 'Dokumen draf peraturan ditolak dan dikembalikan untuk dilakukan harmonisasi ulang.'
+            ]
+        );
+    }
+
+    return updatedItem;
 };
 
 const removePersetujuan = async (id) => {

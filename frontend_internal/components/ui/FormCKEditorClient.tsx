@@ -350,17 +350,25 @@ import {
 
   List,
   Indent,
+  IndentBlock,
 
   BlockQuote,
   HorizontalLine,
 
   Table,
   TableToolbar,
+  TableProperties,
+  TableCellProperties,
 
   RemoveFormat,
 
   SpecialCharacters,
   SpecialCharactersEssentials,
+
+  SourceEditing,
+  GeneralHtmlSupport,
+  FindAndReplace,
+  SelectAll,
 
   // ==========================================
   // IMAGE
@@ -382,6 +390,7 @@ interface Props {
   disabled?: boolean;
   placeholder?: string;
   minHeight?: number;
+  maxHeight?: number;
 }
 
 const editorConfig = {
@@ -404,6 +413,7 @@ const editorConfig = {
 
     List,
     Indent,
+    IndentBlock,
 
     Link,
 
@@ -412,9 +422,16 @@ const editorConfig = {
 
     Table,
     TableToolbar,
+    TableProperties,
+    TableCellProperties,
 
     SpecialCharacters,
     SpecialCharactersEssentials,
+
+    SourceEditing,
+    GeneralHtmlSupport,
+    FindAndReplace,
+    SelectAll,
 
     // ==========================================
     // IMAGE PLUGINS
@@ -431,6 +448,11 @@ const editorConfig = {
     items: [
       "undo",
       "redo",
+
+      "|",
+
+      "findAndReplace",
+      "selectAll",
 
       "|",
 
@@ -485,9 +507,21 @@ const editorConfig = {
       "|",
 
       "specialCharacters",
+      "sourceEditing",
     ],
 
     shouldNotGroupWhenFull: true,
+  },
+
+  htmlSupport: {
+    allow: [
+      {
+        name: /.*/,
+        attributes: true,
+        classes: true,
+        styles: true,
+      },
+    ],
   },
 
   // ==========================================
@@ -659,6 +693,7 @@ export default function CKEditorClient({
   disabled = false,
   placeholder = "Masukkan konten...",
   minHeight = 400,
+  maxHeight = 600,
 }: Props) {
   return (
     <div className="ckeditor-wrapper">
@@ -685,10 +720,12 @@ export default function CKEditorClient({
 
         .ckeditor-wrapper .ck.ck-editor {
           width: 100%;
+          display: flex;
+          flex-direction: column;
         }
 
         /* ==========================================
-           TOOLBAR
+           TOOLBAR STICKY
         ========================================== */
 
         .ckeditor-wrapper .ck.ck-toolbar {
@@ -696,6 +733,9 @@ export default function CKEditorClient({
           border-bottom: 1px solid #e5e7eb !important;
           background: #f8fafc !important;
           padding: 8px !important;
+          position: sticky;
+          top: 0;
+          z-index: 10;
         }
 
         .ckeditor-wrapper
@@ -719,21 +759,29 @@ export default function CKEditorClient({
         }
 
         /* ==========================================
-           EDITOR
+           EDITOR SCROLLABLE
         ========================================== */
+
+        .ckeditor-wrapper
+          .ck.ck-editor__main {
+          overflow-y: auto !important;
+          max-height: ${maxHeight}px !important;
+          min-height: ${minHeight}px !important;
+          scrollbar-width: thin;
+        }
 
         .ckeditor-wrapper
           .ck.ck-editor__main
           > .ck-editor__editable {
           border: 0 !important;
+          min-height: ${minHeight}px !important;
+          overflow-y: visible !important;
         }
 
         .ckeditor-wrapper
           .ck.ck-editor__editable.ck-focused {
           border: 0 !important;
-
-          box-shadow:
-            inset 0 0 0 1px #2563eb !important;
+          box-shadow: inset 0 0 0 1px #2563eb !important;
         }
 
         .ckeditor-wrapper

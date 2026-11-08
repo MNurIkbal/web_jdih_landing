@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSmartFallbackResponse } from "@/lib/chat-fallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,16 +57,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (!ACS_API_KEY) {
-      // Backend ACS API key belum diatur, gunakan fallback cerdas
-      const fallback = getSmartFallbackResponse(message);
-      return NextResponse.json({
-        success: true,
-        message: fallback,
-        isFallback: true,
-        insights: [],
-        sample_data: [],
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Konfigurasi ACS_API_KEY belum diatur pada environment server.",
+        },
+        { status: 500 },
+      );
     }
+
+    // Batasi pesan maksimal 4800 karakter untuk mencegah validation error 400 dari backend ACS
+    const safeQuestion = message.length > 4800 ? message.slice(0, 4800) : message;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ACS_TIMEOUT_MS);
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
           "x-api-key": ACS_API_KEY,
         },
         body: JSON.stringify({
-          question: message,
+          question: safeQuestion,
           conversationId,
           divisionId: "Kepegawaian",
           isThinking: true,
@@ -89,30 +89,28 @@ export async function POST(req: NextRequest) {
         signal: controller.signal,
       });
     } catch (err: unknown) {
-      // Timeout atau network fetch error ke backend ACS -> gunakan fallback
-      console.warn("Koneksi ke backend ACS error/timeout, menggunakan jawaban cadangan:", err);
-      const fallback = getSmartFallbackResponse(message);
-      return NextResponse.json({
-        success: true,
-        message: fallback,
-        isFallback: true,
-        insights: [],
-        sample_data: [],
-      });
+      console.error("Koneksi ke backend ACS gagal:", err);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Gagal terhubung ke layanan AI backend ACS. Silakan coba kembali.",
+        },
+        { status: 502 },
+      );
     } finally {
       clearTimeout(timeout);
     }
 
     if (!acsRes.ok) {
-      console.warn(`Backend ACS merespons dengan status ${acsRes.status}, menggunakan jawaban cadangan.`);
-      const fallback = getSmartFallbackResponse(message);
-      return NextResponse.json({
-        success: true,
-        message: fallback,
-        isFallback: true,
-        insights: [],
-        sample_data: [],
-      });
+      const errText = await acsRes.text();
+      console.error(`Backend ACS error (${acsRes.status}):`, errText);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Layanan AI backend ACS merespons dengan status ${acsRes.status}: ${errText.slice(0, 150)}`,
+        },
+        { status: acsRes.status },
+      );
     }
 
     const acsData: AcsApiResponse = await acsRes.json();
@@ -134,21 +132,11 @@ export async function POST(req: NextRequest) {
       conversationStats: acsData.conversationStats ?? null,
     });
   } catch (error: unknown) {
-    console.error("Error pada route /api/chat, beralih ke fallback:", error);
-    // Jika masih ada parameter message dalam request, berikan fallback
-    try {
-      const fallback = getSmartFallbackResponse("umum");
-      return NextResponse.json({
-        success: true,
-        message: fallback,
-        isFallback: true,
-      });
-    } catch {
-      const err = error instanceof Error ? error : new Error("Unknown error");
-      return NextResponse.json(
-        { success: false, error: err.message || "Internal Server Error" },
-        { status: 500 },
-      );
-    }
+    console.error("Error pada route /api/chat:", error);
+    const err = error instanceof Error ? error : new Error("Unknown error");
+    return NextResponse.json(
+      { success: false, error: err.message || "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }

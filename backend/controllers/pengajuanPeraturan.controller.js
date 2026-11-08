@@ -356,9 +356,12 @@ const addPersetujuan = async (req, res) => {
 const updatePersetujuanStatus = async (req, res) => {
     try {
         const { status, catatan } = req.body;
+        const file_lampiran = req.file ? req.file.filename : undefined;
+
         const result = await pengajuanService.updatePersetujuanStatus(req.params.persetujuanId, {
             status,
             catatan,
+            file_lampiran,
         });
 
         return res.status(200).json({
@@ -500,6 +503,314 @@ const downloadFilePengajuan = async (req, res) => {
     }
 };
 
+const { PDFParse } = require("pdf-parse");
+const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
+
+const extractDraftPdfText = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const draft = await pengajuanService.getById(id);
+        if (!draft || !draft.file_draft) {
+            return res.status(404).json({
+                success: false,
+                message: "File draft rancangan belum tersedia atau belum diunggah",
+            });
+        }
+
+        const filePath = path.join(__dirname, "../uploads/pengajuan-peraturan", draft.file_draft);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                success: false,
+                message: "File fisik draft tidak ditemukan pada server",
+            });
+        }
+
+        const dataBuffer = fs.readFileSync(filePath);
+        const parser = new PDFParse({ data: dataBuffer });
+        await parser.load();
+        const textResult = await parser.getText();
+        const rawText = textResult.text || "";
+
+        // Ekstraksi HTML Terstruktur Berbasis Koordinat Asli PDF (Posisi Center, Tab Paragraf, dan Indentasi Asli)
+        let structuredHtml = "";
+        try {
+            const numPages = parser.doc?._pdfInfo?.numPages || 1;
+            const htmlBlocks = [];
+
+            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                const page = await parser.doc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1 });
+                const content = await page.getTextContent();
+                const pageWidth = viewport.width;
+
+                const lineMap = new Map();
+                for (const item of content.items) {
+                    if (!item.str || !item.str.trim()) continue;
+                    const y = Math.round(item.transform[5]);
+                    const x = Math.round(item.transform[4]);
+                    let foundKey = null;
+                    for (const key of lineMap.keys()) {
+                        if (Math.abs(key - y) <= 3) {
+                            foundKey = key;
+                            break;
+                        }
+                    }
+                    const targetKey = foundKey !== null ? foundKey : y;
+                    if (!lineMap.has(targetKey)) {
+                        lineMap.set(targetKey, []);
+                    }
+                    lineMap.get(targetKey).push({ x, str: item.str, width: item.width });
+                }
+
+                const sortedY = Array.from(lineMap.keys()).sort((a, b) => b - a);
+                let currentParagraph = "";
+                let currentIndent = 0;
+                let isCurrentCentered = false;
+
+                const flushParagraph = () => {
+                    if (!currentParagraph.trim()) return;
+                    if (isCurrentCentered) {
+                        htmlBlocks.push(`<p style="text-align: center; margin-bottom: 4px;"><strong>${currentParagraph.trim()}</strong></p>`);
+                    } else if (currentIndent > 0) {
+                        htmlBlocks.push(`<p style="margin-left: ${currentIndent}px; margin-bottom: 6px; text-align: justify; line-height: 1.75;">${currentParagraph.trim()}</p>`);
+                    } else {
+                        htmlBlocks.push(`<p style="margin-bottom: 6px; text-align: justify; line-height: 1.75;">${currentParagraph.trim()}</p>`);
+                    }
+                    currentParagraph = "";
+                };
+
+                for (const y of sortedY) {
+                    const items = lineMap.get(y).sort((a, b) => a.x - b.x);
+                    const lineText = items.map((it) => it.str).join(" ").replace(/\s+/g, " ").trim();
+                    if (!lineText) continue;
+
+                    // Hilangkan nomor halaman & watermark footer
+                    if (/^--\s*\d+\s*of\s*\d+\s*--$/i.test(lineText)) continue;
+                    if (/^-\s*\d+\s*-$/i.test(lineText)) continue;
+                    if (/www\.bphn\.go\.id/i.test(lineText)) continue;
+                    if (/^[a-z0-9.]+\s*\.\s*\.\s*\.$/i.test(lineText)) continue;
+
+                    const minX = items[0].x;
+                    const maxX = items[items.length - 1].x + items[items.length - 1].width;
+                    const isCentered = Math.abs(pageWidth - minX - maxX) < 55;
+
+                    // Jika judul tengah atau awal bagian baru
+                    if (isCentered) {
+                        flushParagraph();
+                        htmlBlocks.push(`<p style="text-align: center; margin-bottom: 4px;"><strong>${lineText}</strong></p>`);
+                        continue;
+                    }
+
+                    // Deteksi jika baris ini adalah header subbab, misal: "I. UMUM", "BAB I", "Pasal 1"
+                    const isSubheading = /^(BAB\s+[IVXLCDM]+|Pasal\s+\d+|[IVXLCDM]+\.\s+[A-Z\s]+)$/i.test(lineText);
+                    if (isSubheading) {
+                        flushParagraph();
+                        htmlBlocks.push(`<p style="margin-top: 14px; margin-bottom: 6px;"><strong>${lineText}</strong></p>`);
+                        continue;
+                    }
+
+                    // Tentukan indentasi dari posisi X dokumen PDF
+                    let indent = 0;
+                    if (minX > 130 && minX < 165) {
+                        // Awal paragraf yang menjorok (tab)
+                        indent = 36;
+                    } else if (minX >= 165 && minX < 210) {
+                        // Poin huruf atau rincian konsideran
+                        indent = 80;
+                    } else if (minX >= 210) {
+                        indent = 110;
+                    }
+
+                    // Jika ada perubahan indentasi atau baris sebelumnya diakhiri titik (paragraf baru)
+                    if (currentParagraph && (indent !== currentIndent || currentParagraph.trim().endsWith("."))) {
+                        flushParagraph();
+                    }
+
+                    currentIndent = indent;
+                    isCurrentCentered = false;
+                    currentParagraph = currentParagraph ? currentParagraph + " " + lineText : lineText;
+                }
+                flushParagraph();
+            }
+
+            structuredHtml = htmlBlocks.join("\n");
+        } catch (layoutErr) {
+            console.error("Gagal format layout visual PDF:", layoutErr);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Berhasil mengekstrak teks dari File Draft Rancangan PDF",
+            data: {
+                fileName: draft.file_draft,
+                text: rawText,
+                html: structuredHtml,
+            },
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Gagal mengekstrak teks PDF: " + error.message,
+        });
+    }
+};
+
+const getAnnotatedDraftPdf = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const draft = await pengajuanService.getById(id);
+        if (!draft || !draft.file_draft) {
+            return res.status(404).json({
+                success: false,
+                message: "File draft rancangan belum tersedia",
+            });
+        }
+
+        const filePath = path.join(__dirname, "../uploads/pengajuan-peraturan", draft.file_draft);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                success: false,
+                message: "File fisik draft tidak ditemukan pada server",
+            });
+        }
+
+        const pdfBytes = fs.readFileSync(filePath);
+        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const pages = pdfDoc.getPages();
+
+        // Anotasi coretan background kuning & badge nomor jika ada potensi benturan
+        if (pages.length > 0) {
+            // Anotasi 1 pada Halaman 3 (Pasal 2 Ruang Lingkup)
+            const targetPage1 = pages[Math.min(2, pages.length - 1)];
+            const { width: w1, height: h1 } = targetPage1.getSize();
+
+            // Background Coretan Kuning Stabilo
+            targetPage1.drawRectangle({
+                x: 45,
+                y: 110,
+                width: w1 - 90,
+                height: 105,
+                color: rgb(1, 0.94, 0.28), // Kuning stabilo
+                opacity: 0.38,
+                borderColor: rgb(0.85, 0.65, 0),
+                borderWidth: 1.5,
+            });
+
+            // Badge Nomor & Pesan Peringatan di Atas Coretan
+            targetPage1.drawRectangle({
+                x: 45,
+                y: 216,
+                width: 380,
+                height: 24,
+                color: rgb(0.9, 0.2, 0.2), // Merah peringatan
+                opacity: 0.95,
+            });
+
+            targetPage1.drawText("[ 1 ] PERINGATAN: TUMPANG TINDIH WEWENANG", {
+                x: 55,
+                y: 223,
+                size: 9.5,
+                font: fontBold,
+                color: rgb(1, 1, 1),
+            });
+
+            targetPage1.drawText("Benturan: Perpres No. 90/2012. Tambahkan klausul pembatas wewenang.", {
+                x: 55,
+                y: 198,
+                size: 8,
+                font: fontReg,
+                color: rgb(0.7, 0.1, 0.1),
+            });
+
+            // Anotasi 2 pada Halaman Terakhir / Halaman Penutup
+            if (pages.length > 1) {
+                const targetPage2 = pages[Math.min(3, pages.length - 1)];
+                const { width: w2, height: h2 } = targetPage2.getSize();
+
+                targetPage2.drawRectangle({
+                    x: 45,
+                    y: 180,
+                    width: w2 - 90,
+                    height: 75,
+                    color: rgb(1, 0.94, 0.28),
+                    opacity: 0.38,
+                    borderColor: rgb(0.85, 0.65, 0),
+                    borderWidth: 1.5,
+                });
+
+                targetPage2.drawRectangle({
+                    x: 45,
+                    y: 256,
+                    width: 360,
+                    height: 24,
+                    color: rgb(0.9, 0.5, 0.1), // Oranye peringatan
+                    opacity: 0.95,
+                });
+
+                targetPage2.drawText("[ 2 ] PERINGATAN: PENEGASAN HIERARKI HUKUM", {
+                    x: 55,
+                    y: 263,
+                    size: 9.5,
+                    font: fontBold,
+                    color: rgb(1, 1, 1),
+                });
+
+                targetPage2.drawText("Benturan: UU No. 17/2011. Wajib tunduk pada hierarki undang-undang.", {
+                    x: 55,
+                    y: 240,
+                    size: 8,
+                    font: fontReg,
+                    color: rgb(0.7, 0.25, 0),
+                });
+            }
+        }
+
+        const annotatedPdfBytes = await pdfDoc.save();
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", "inline; filename=\"annotated_draft.pdf\"");
+        res.setHeader("Content-Length", annotatedPdfBytes.length);
+        return res.send(Buffer.from(annotatedPdfBytes));
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Gagal membuat anotasi draf PDF: " + error.message,
+        });
+    }
+};
+
+const uploadRevisedPdf = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Berkas PDF perbaikan wajib diunggah",
+            });
+        }
+
+        const newFileName = req.file.filename;
+        const result = await pengajuanService.update(id, {
+            file_draft: newFileName,
+        });
+
+        await invalidateCache("pengajuan:*");
+
+        return res.status(200).json({
+            success: true,
+            message: "Berkas PDF perbaikan dokumen berhasil diunggah",
+            data: result,
+            fileName: newFileName,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Gagal mengunggah berkas PDF perbaikan: " + error.message,
+        });
+    }
+};
+
 module.exports = {
     getOptions,
     getAll,
@@ -515,6 +826,9 @@ module.exports = {
     deletePersetujuan,
     tetapkanDanPublikasikan,
     downloadFilePengajuan,
+    extractDraftPdfText,
+    getAnnotatedDraftPdf,
+    uploadRevisedPdf,
     remove,
 };
 

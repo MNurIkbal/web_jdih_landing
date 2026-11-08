@@ -87,6 +87,19 @@ app.use(
 app.use("/api/master-data/login", authRoutes);
 app.use("/api/web", cacheMiddleware("web", 120), WebRoute);
 
+const pengajuanController = require("./controllers/pengajuanPeraturan.controller");
+
+// Endpoint ekstraksi teks draft PDF & download file dapat diakses publik/internal tanpa memblokir sesi browser
+app.get(
+  "/api/master-data/pengajuan-peraturan/:id/extract-draft-text",
+  pengajuanController.extractDraftPdfText
+);
+
+app.get(
+  "/api/master-data/pengajuan-peraturan/:id/annotated-draft-pdf",
+  pengajuanController.getAnnotatedDraftPdf
+);
+
 // Pengajuan Peraturan & Dokumen Hukum dapat diakses oleh: superadmin, admin (verifikator), dan pengguna (pembuat pengajuan)
 app.use(
   "/api/master-data/dokumen-hukum",

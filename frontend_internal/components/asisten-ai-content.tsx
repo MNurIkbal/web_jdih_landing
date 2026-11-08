@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 
 import type { ChatMessage } from "@/types/chat";
 import { sendChatMessage } from "@/services/chat-service";
-import { getSmartFallbackResponse } from "@/lib/chat-fallback";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -263,184 +262,12 @@ export default function AsistenAIContent() {
   //   }
   // }, [message, conversationId]);
 
-  function isValidContext(currentText: string): boolean {
-    const current = currentText.toLowerCase().trim();
-
-    const legalKeywords = [
-      "jdih",
-      "jaringan dokumentasi",
-      "informasi hukum",
-      "dokumen",
-      "peraturan",
-      "regulasi",
-      "undang-undang",
-      "uu",
-      "perpres",
-      "peraturan presiden",
-      "peraturan pemerintah",
-      "pp",
-      "keputusan",
-      "instruksi",
-      "hukum",
-      "pasal",
-      "ayat",
-      "bab",
-      "bagian",
-      "ketentuan",
-      "bin",
-      "badan intelijen negara",
-      "intelijen",
-      "kebijakan",
-      "aturan",
-    ];
-
-    return legalKeywords.some((keyword) => {
-      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-      const regex = new RegExp(`(^|\\s)${escaped}(?=\\s|$|[.,!?;:()])`, "i");
-
-      return regex.test(current);
-    });
-  }
-
-  function isFollowUpQuestion(
-    currentText: string,
-    previousConversation: ChatMessage[],
-  ): boolean {
-    const current = currentText.toLowerCase().trim();
-
-    if (previousConversation.length === 0) {
-      return false;
-    }
-
-    // =========================================================
-    // FOLLOW-UP YANG SECARA EKSPLISIT MERUJUK KE KONTEN HUKUM
-    // =========================================================
-    const explicitFollowUpKeywords = [
-      "peraturan itu", "aturan itu", "uu itu", "undang-undang itu",
-      "perpres itu", "pp itu", "pasal itu", "ayat itu", "bab itu", "dokumen itu",
-      "peraturan tersebut", "aturan tersebut", "uu tersebut",
-      "undang-undang tersebut", "perpres tersebut", "pp tersebut",
-      "pasal tersebut", "ayat tersebut", "bab tersebut", "dokumen tersebut",
-      "peraturan ini", "aturan ini", "uu ini", "undang-undang ini",
-      "perpres ini", "pp ini", "pasal ini", "ayat ini", "bab ini",
-      "yang dimaksud", "maksudnya", "apa isinya", "apa maksudnya",
-      "isinya apa", "tentang apa", "lebih detail", "lebih rinci",
-      "jelaskan lagi", "jelaskan lebih lanjut", "lanjutkan",
-    ];
-
-    if (explicitFollowUpKeywords.some((keyword) => current.includes(keyword))) {
-      return true;
-    }
-
-    // =========================================================
-    // REFERENSI PASAL / AYAT / BAB
-    // =========================================================
-    const legalReferencePattern = /^(bab|pasal|ayat|bagian|ketentuan)\s+[a-z0-9ivx.-]+/i;
-    if (legalReferencePattern.test(current)) {
-      return true;
-    }
-
-    // =========================================================
-    // PERTANYAAN TENTANG WAKTU / STATUS PERATURAN
-    // =========================================================
-    const regulationFollowUpPatterns = [
-      /^tahun berapa.*(dibuat|ditetapkan|disahkan|diterbitkan|berlaku)/i,
-      /^kapan.*(dibuat|ditetapkan|disahkan|diterbitkan|berlaku)/i,
-      /^tanggal berapa.*(ditetapkan|disahkan|diterbitkan)/i,
-      /^sejak kapan.*(berlaku|diterapkan)/i,
-      /^kapan.*berlaku/i,
-    ];
-    if (regulationFollowUpPatterns.some((pattern) => pattern.test(current))) {
-      return true;
-    }
-
-    // =========================================================
-    // PERTANYAAN LANJUTAN DENGAN REFERENSI "INI"
-    // =========================================================
-    const contextualReferencePatterns = [
-      /^ini\s+(berlaku|ditetapkan|disahkan|dibuat|diterbitkan)/i,
-      /^ini\s+(tentang|mengatur|menjelaskan)/i,
-      /^yang\s+ini\s+(tentang|mengatur|menjelaskan)/i,
-    ];
-    if (contextualReferencePatterns.some((pattern) => pattern.test(current))) {
-      return true;
-    }
-
-    // =========================================================
-    // REFERENSI KATA GANTI UMUM (KATA BERAKHIRAN -NYA, ITU, INI, TERSEBUT)
-    // =========================================================
-    const generalReferencePattern = /\b([a-z]+nya|itu|ini|tersebut|dimaksud)\b/i;
-    if (generalReferencePattern.test(current)) {
-      // Pastikan ada riwayat obrolan dengan konteks hukum yang valid
-      const hasPreviousLegalContext = previousConversation.some(
-        (msg) => msg.type === "user" && isValidContext(msg.message)
-      );
-      if (hasPreviousLegalContext) {
-        return true;
-      }
-    }
-
-    // =========================================================
-    // KATA TANYA SEDERHANA SEBAGAI FOLLOW UP JIKA ADA KONTEKS HUKUM SEBELUMNYA
-    // =========================================================
-    const questionWordsPattern = /^(apa|siapa|kapan|di mana|dimana|ke mana|kemana|dari mana|darimana|mengapa|kenapa|bagaimana|berapa)\b/i;
-    // Jika pertanyaan sangat pendek (<= 6 kata) dan diawali kata tanya
-    if (questionWordsPattern.test(current) && current.split(/\s+/).length <= 6) {
-      const hasPreviousLegalContext = previousConversation.some(
-        (msg) => msg.type === "user" && isValidContext(msg.message)
-      );
-      // Contoh: "di mana tempat penempatannya" (5 kata) -> cocok
-      // Tapi karena "bola indonesia" tidak diawali kata tanya, maka akan di block.
-      // "ibu kota indonesia di mana" -> tidak diawali kata tanya (diawali "ibu"), di block.
-      // "di mana ibu kota indonesia" -> (5 kata), diawali "di mana". 
-      // Akan lolos JIKA sebelumnya ada konteks hukum. Ini sudah cukup aman.
-      if (hasPreviousLegalContext) {
-        return true;
-      }
-    }
-
-    // =========================================================
-    // JIKA ADA KATA HUKUM YANG JELAS
-    // =========================================================
-    if (isValidContext(current)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  function canProcessQuestion(
-    currentText: string,
-    previousConversation: ChatMessage[],
-  ): boolean {
-    // =========================================================
-    // CHAT PERTAMA
-    // =========================================================
-
-    if (previousConversation.length === 0) {
-      return isValidContext(currentText);
-    }
-
-    if (isValidContext(currentText)) {
-      return true;
-    }
-
-    if (isFollowUpQuestion(currentText, previousConversation)) {
-      return true;
-    }
-
-    return false;
-  }
-
   const handleSendMessage = useCallback(async () => {
     if (!message.trim() || !conversationId || isTyping) {
       return;
     }
 
     const userText = message.trim();
-
-    const previousConversation = conversation;
 
     const userMsg: ChatMessage = {
       id: newId(),
@@ -450,27 +277,7 @@ export default function AsistenAIContent() {
     };
 
     setConversation((prev) => [...prev, userMsg]);
-
     setMessage("");
-
-    const canProcess = canProcessQuestion(userText, previousConversation);
-
-    if (!canProcess) {
-      const blockedMsg: ChatMessage = {
-        id: newId(),
-        type: "assistant",
-        message:
-          "Maaf, pertanyaan tidak dapat diproses karena berada di luar konteks percakapan.\n\n" +
-          "Silakan ajukan pertanyaan yang berkaitan dengan JDIH, hukum, " +
-          "peraturan Intelijen Negara.",
-        timestamp: nowTimestamp(),
-      };
-
-      setConversation((prev) => [...prev, blockedMsg]);
-
-      return;
-    }
-
     setIsTyping(true);
 
     try {
@@ -489,23 +296,21 @@ export default function AsistenAIContent() {
       };
 
       setConversation((prev) => [...prev, aiMsg]);
-    } catch (error) {
-      console.warn("Gagal menghubungi backend AI, beralih ke jawaban cadangan offline:", error);
-      const fallbackText = getSmartFallbackResponse(userText);
-
+    } catch (error: any) {
+      console.error("Gagal mendapatkan respons dari layanan AI:", error);
       setConversation((prev) => [
         ...prev,
         {
           id: newId(),
           type: "assistant",
-          message: fallbackText,
+          message: error?.message || "Maaf, terjadi kendala saat menghubungi asisten AI. Silakan coba kembali sesaat lagi.",
           timestamp: nowTimestamp(),
         },
       ]);
     } finally {
       setIsTyping(false);
     }
-  }, [message, conversationId, isTyping, conversation]);
+  }, [message, conversationId, isTyping]);
 
   const handleClear = () => {
     if (!conversationId) return;

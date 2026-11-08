@@ -48,7 +48,6 @@ export const useCreateDokumenHukum = () => {
         queryKey: ["DokumenHukum"],
       });
     },
-
     onError: (error: any) => {
       toast.error(getErrorMessage(error));
     },
@@ -57,18 +56,14 @@ export const useCreateDokumenHukum = () => {
 
 export const useUpdateDokumenHukum = () => {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: ({ id, data }: any) => useupdateDokumenHukum(id, data),
-
     onSuccess: () => {
       toast.success("Berhasil update data");
-
       qc.invalidateQueries({
         queryKey: ["DokumenHukum"],
       });
     },
-
     onError: (error: any) => {
       toast.error(getErrorMessage(error));
     },
@@ -77,18 +72,14 @@ export const useUpdateDokumenHukum = () => {
 
 export const useDeleteDokumenHukum = () => {
   const qc = useQueryClient();
-
   return useMutation({
     mutationFn: deleteDokumenHukum,
-
     onSuccess: () => {
       toast.success("Berhasil hapus data");
-
       qc.invalidateQueries({
         queryKey: ["DokumenHukum"],
       });
     },
-
     onError: (error: any) => {
       toast.error(getErrorMessage(error));
     },

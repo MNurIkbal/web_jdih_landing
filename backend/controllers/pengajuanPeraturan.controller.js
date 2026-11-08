@@ -334,8 +334,9 @@ const submitHarmonisasi = async (req, res) => {
 // Tahap 4: Persetujuan
 const addPersetujuan = async (req, res) => {
     try {
-        const { nama_pejabat, jabatan } = req.body;
+        const { user_id, nama_pejabat, jabatan } = req.body;
         const result = await pengajuanService.addPersetujuan(req.params.id, {
+            user_id,
             nama_pejabat,
             jabatan,
         });

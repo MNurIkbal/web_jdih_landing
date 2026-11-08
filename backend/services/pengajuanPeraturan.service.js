@@ -44,8 +44,8 @@ const submitHarmonisasi = async (draftId, data) => {
 };
 
 const addPersetujuan = async (draftId, data) => {
-    if (!data.nama_pejabat || !data.jabatan) {
-        throw new Error("Nama dan jabatan pejabat wajib diisi");
+    if (!data.nama_pejabat) {
+        throw new Error("Nama pejabat wajib diisi");
     }
     return await pengajuanRepo.addPersetujuanPejabat(draftId, data);
 };

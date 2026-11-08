@@ -48,9 +48,12 @@ const findAll = async ({ search = "", page = 1, size = 10, tahapan = "", role = 
     let values = [];
     let idx = 1;
 
-    // Jika role adalah admin / verifikator, sembunyikan status: Draft, Ditolak, Revisi, Ditetapkan, dan Selesai
+    // Sembunyikan draft dengan status Ditetapkan dan Selesai (sudah terbit ke dokumen hukum)
+    conditions.push(`status NOT IN ('Ditetapkan', 'Selesai')`);
+
+    // Jika role adalah admin / verifikator, sembunyikan juga status: Draft, Ditolak, Revisi
     if (role === "admin") {
-        conditions.push(`status NOT IN ('Draft', 'Ditolak', 'Revisi', 'Ditetapkan', 'Selesai')`);
+        conditions.push(`status NOT IN ('Draft', 'Ditolak', 'Revisi')`);
     }
 
     if (search) {
@@ -352,14 +355,14 @@ const updateHarmonisasi = async (draftId, data) => {
 
 // Tahap 4: Persetujuan
 const addPersetujuanPejabat = async (draftId, data) => {
-    const { nama_pejabat, jabatan } = data;
+    const { user_id, nama_pejabat, jabatan } = data;
     const query = `
         INSERT INTO draft_peraturan_persetujuan (
-            draft_id, nama_pejabat, jabatan, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, 'Menunggu', NOW(), NOW())
+            draft_id, user_id, nama_pejabat, jabatan, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, 'Menunggu', NOW(), NOW())
         RETURNING *;
     `;
-    const res = await pool.query(query, [draftId, nama_pejabat, jabatan]);
+    const res = await pool.query(query, [draftId, user_id || null, nama_pejabat, jabatan || "Admin"]);
     await pool.query(`UPDATE draft_peraturan SET tahapan = 'Persetujuan', status = 'Persetujuan', updated_at = NOW() WHERE id = $1`, [draftId]);
     return res.rows[0];
 };
@@ -431,11 +434,15 @@ const penetapanDanPublikasi = async (draftId, data) => {
             judul, kategori, nomor, tahun, bidang, tipe_dokumen,
             tempat_penetapan, tanggal_penetapan, tanggal_pengundangan, tanggal_berlaku,
             file_dokumen, file_abstrak, status, dilihat, download,
+            pemrakarsa, penanggung_jawab, nomor_rancangan, urgensi, dasar_hukum,
+            ringkasan, sumber, subjek, draft_id,
             created_at, updated_at
         ) VALUES (
             $1, $2, $3, $4, $5, $6,
-            $7, $8, $8, $8,
-            $9, $10, 'Berlaku', 0, 0,
+            $7, $8, $9, $10,
+            $11, $12, 'Berlaku', 0, 0,
+            $13, $14, $15, $16, $17,
+            $18, $19, $20, $21,
             NOW(), NOW()
         ) RETURNING id;
     `;
@@ -445,12 +452,23 @@ const penetapanDanPublikasi = async (draftId, data) => {
         draft.kategori || "Peraturan",
         nomor_penetapan || draft.nomor_rancangan || "1",
         draft.tahun || new Date().getFullYear(),
-        bidang || "Hukum",
-        tipe_dokumen || "Peraturan",
-        tempat_penetapan || "Jakarta",
-        tanggal_penetapan || new Date(),
+        bidang || draft.bidang || "Hukum",
+        tipe_dokumen || draft.tipe_dokumen || "Peraturan",
+        tempat_penetapan || draft.tempat_penetapan || "Jakarta",
+        tanggal_penetapan || draft.tanggal_penetapan || new Date(),
+        draft.tanggal_pengundangan || tanggal_penetapan || new Date(),
+        draft.tanggal_berlaku || tanggal_penetapan || new Date(),
         finalDoc,
         draft.file_naskah_akademik || null,
+        draft.pemrakarsa || null,
+        draft.penanggung_jawab || null,
+        draft.nomor_rancangan || null,
+        draft.urgensi || null,
+        draft.dasar_hukum || null,
+        draft.ringkasan || null,
+        draft.sumber || null,
+        draft.subjek || draft.subject || null,
+        draftId,
     ];
 
     const insertedDoc = await pool.query(docQuery, docValues);

@@ -164,4 +164,15 @@ export const UploadRevisedDraftPdfSchema = z.object({
 
 export type UploadRevisedDraftPdfFormValues = z.infer<typeof UploadRevisedDraftPdfSchema>;
 
+export const PenunjukanPejabatSchema = z.object({
+  user_id: z
+    .string({ required_error: "Pilih pejabat / admin terlebih dahulu" })
+    .trim()
+    .min(1, "Pilih pejabat / admin terlebih dahulu"),
+  nama_pejabat: z.string().trim().optional(),
+  jabatan: z.string().trim().optional(),
+});
+
+export type PenunjukanPejabatFormValues = z.infer<typeof PenunjukanPejabatSchema>;
+
 

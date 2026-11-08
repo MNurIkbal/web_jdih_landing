@@ -579,6 +579,29 @@ const getOptions = async ({ type = "", query = "" } = {}) => {
 
     if (type) {
         const t = type.toLowerCase().trim();
+        if (t === "admin" || t === "users" || t === "pejabat") {
+            try {
+                let userQuery = `
+                    SELECT id, nama, role 
+                    FROM users 
+                    WHERE deleted_at IS NULL 
+                      AND LOWER(role) = 'admin'
+                `;
+                const queryParams = [];
+                if (searchStr) {
+                    userQuery += ` AND LOWER(nama) LIKE $1`;
+                    queryParams.push(`%${searchStr}%`);
+                }
+                userQuery += ` ORDER BY nama ASC`;
+                const usersRes = await pool.query(userQuery, queryParams);
+                return usersRes.rows.map((u) => ({
+                    value: String(u.id),
+                    label: u.nama,
+                }));
+            } catch (err) {
+                return [];
+            }
+        }
         if (t === "kategori") return await buildList("kategori", defaults.kategori);
         if (t === "tipe_dokumen") return await buildList("tipe_dokumen", defaults.tipe_dokumen);
         if (t === "bidang") return await buildList("bidang", defaults.bidang);
@@ -601,12 +624,24 @@ const getOptions = async ({ type = "", query = "" } = {}) => {
     }
 
     // Return all categories bundle
-    const [kategori, tipe_dokumen, bidang, subject] = await Promise.all([
+    const [kategori, tipe_dokumen, bidang, subject, adminUsersRes] = await Promise.all([
         buildList("kategori", defaults.kategori),
         buildList("tipe_dokumen", defaults.tipe_dokumen),
         buildList("bidang", defaults.bidang),
         buildList("subjek", defaults.subject),
+        pool.query(`
+            SELECT id, nama, role 
+            FROM users 
+            WHERE deleted_at IS NULL 
+              AND LOWER(role) = 'admin'
+            ORDER BY nama ASC
+        `).catch(() => ({ rows: [] })),
     ]);
+
+    const admin = (adminUsersRes.rows || []).map((u) => ({
+        value: String(u.id),
+        label: u.nama,
+    }));
 
     const status = defaults.status.map((s) => ({ value: s, label: s }));
     const tahun = defaults.tahun.map((y) => ({ value: y, label: y }));
@@ -618,6 +653,7 @@ const getOptions = async ({ type = "", query = "" } = {}) => {
         subject,
         status,
         tahun,
+        admin,
     };
 };
 

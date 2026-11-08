@@ -682,16 +682,16 @@ const getAnnotatedDraftPdf = async (req, res) => {
 
         // Anotasi coretan background kuning & badge nomor jika ada potensi benturan
         if (pages.length > 0) {
-            // Anotasi 1 pada Halaman 3 (Pasal 2 Ruang Lingkup)
-            const targetPage1 = pages[Math.min(2, pages.length - 1)];
+            // Anotasi 1 pada Halaman 1 (selalu terlihat di halaman awal)
+            const targetPage1 = pages[0];
             const { width: w1, height: h1 } = targetPage1.getSize();
 
             // Background Coretan Kuning Stabilo
             targetPage1.drawRectangle({
-                x: 45,
-                y: 110,
-                width: w1 - 90,
-                height: 105,
+                x: 40,
+                y: h1 > 350 ? h1 - 320 : 80,
+                width: w1 - 80,
+                height: 120,
                 color: rgb(1, 0.94, 0.28), // Kuning stabilo
                 opacity: 0.38,
                 borderColor: rgb(0.85, 0.65, 0),
@@ -700,40 +700,40 @@ const getAnnotatedDraftPdf = async (req, res) => {
 
             // Badge Nomor & Pesan Peringatan di Atas Coretan
             targetPage1.drawRectangle({
-                x: 45,
-                y: 216,
-                width: 380,
+                x: 40,
+                y: (h1 > 350 ? h1 - 320 : 80) + 120,
+                width: Math.min(380, w1 - 80),
                 height: 24,
                 color: rgb(0.9, 0.2, 0.2), // Merah peringatan
                 opacity: 0.95,
             });
 
             targetPage1.drawText("[ 1 ] PERINGATAN: TUMPANG TINDIH WEWENANG", {
-                x: 55,
-                y: 223,
+                x: 50,
+                y: (h1 > 350 ? h1 - 320 : 80) + 127,
                 size: 9.5,
                 font: fontBold,
                 color: rgb(1, 1, 1),
             });
 
             targetPage1.drawText("Benturan: Perpres No. 90/2012. Tambahkan klausul pembatas wewenang.", {
-                x: 55,
-                y: 198,
+                x: 50,
+                y: (h1 > 350 ? h1 - 320 : 80) + 98,
                 size: 8,
                 font: fontReg,
                 color: rgb(0.7, 0.1, 0.1),
             });
 
-            // Anotasi 2 pada Halaman Terakhir / Halaman Penutup
+            // Anotasi 2 pada Halaman 2 jika tersedia
             if (pages.length > 1) {
-                const targetPage2 = pages[Math.min(3, pages.length - 1)];
+                const targetPage2 = pages[1];
                 const { width: w2, height: h2 } = targetPage2.getSize();
 
                 targetPage2.drawRectangle({
-                    x: 45,
-                    y: 180,
-                    width: w2 - 90,
-                    height: 75,
+                    x: 40,
+                    y: h2 > 350 ? h2 - 300 : 90,
+                    width: w2 - 80,
+                    height: 100,
                     color: rgb(1, 0.94, 0.28),
                     opacity: 0.38,
                     borderColor: rgb(0.85, 0.65, 0),
@@ -741,25 +741,25 @@ const getAnnotatedDraftPdf = async (req, res) => {
                 });
 
                 targetPage2.drawRectangle({
-                    x: 45,
-                    y: 256,
-                    width: 360,
+                    x: 40,
+                    y: (h2 > 350 ? h2 - 300 : 90) + 100,
+                    width: Math.min(360, w2 - 80),
                     height: 24,
                     color: rgb(0.9, 0.5, 0.1), // Oranye peringatan
                     opacity: 0.95,
                 });
 
                 targetPage2.drawText("[ 2 ] PERINGATAN: PENEGASAN HIERARKI HUKUM", {
-                    x: 55,
-                    y: 263,
+                    x: 50,
+                    y: (h2 > 350 ? h2 - 300 : 90) + 107,
                     size: 9.5,
                     font: fontBold,
                     color: rgb(1, 1, 1),
                 });
 
                 targetPage2.drawText("Benturan: UU No. 17/2011. Wajib tunduk pada hierarki undang-undang.", {
-                    x: 55,
-                    y: 240,
+                    x: 50,
+                    y: (h2 > 350 ? h2 - 300 : 90) + 78,
                     size: 8,
                     font: fontReg,
                     color: rgb(0.7, 0.25, 0),

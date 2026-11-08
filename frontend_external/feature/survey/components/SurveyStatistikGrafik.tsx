@@ -53,8 +53,8 @@ const JAWABAN_CONFIG = [
   },
 ];
 
-export default function SurveyStatistikGrafik() {
-  const { data: stats, isLoading, refetch } = useSurveyStatistik();
+export default function SurveyStatistikGrafik({ tipe = "layanan" }: { tipe?: "layanan" | "dokumen" }) {
+  const { data: stats, isLoading, refetch } = useSurveyStatistik(tipe);
 
   const totalResponden = stats?.totalResponden || 0;
   const persentaseKepuasan = stats?.persentaseKepuasan || 0;

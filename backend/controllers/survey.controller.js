@@ -3,8 +3,8 @@ const surveyService = require("../services/survey.service");
 // Admin: Ambil semua pertanyaan survey
 const getAll = async (req, res) => {
   try {
-    const { search = "", page = 0, size = 10 } = req.query;
-    const result = await surveyService.getAllPertanyaan({ search, page, size });
+    const { search = "", tipe = "layanan", page = 0, size = 10 } = req.query;
+    const result = await surveyService.getAllPertanyaan({ search, tipe, page, size });
     return res.status(200).json({
       success: true,
       message: "Daftar pertanyaan survey berhasil diambil",
@@ -47,7 +47,7 @@ const getById = async (req, res) => {
 // Admin: Tambah pertanyaan survey
 const create = async (req, res) => {
   try {
-    const { pertanyaan, status = true, urutan = 0 } = req.body;
+    const { pertanyaan, status = true, urutan = 0, tipe_survey = "layanan" } = req.body;
     if (!pertanyaan || !pertanyaan.trim()) {
       return res.status(400).json({
         success: false,
@@ -55,7 +55,7 @@ const create = async (req, res) => {
       });
     }
 
-    const data = await surveyService.createPertanyaan({ pertanyaan, status, urutan });
+    const data = await surveyService.createPertanyaan({ pertanyaan, status, urutan, tipe_survey });
     return res.status(201).json({
       success: true,
       message: "Pertanyaan survey berhasil ditambahkan",
@@ -74,9 +74,9 @@ const create = async (req, res) => {
 const update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { pertanyaan, status, urutan } = req.body;
+    const { pertanyaan, status, urutan, tipe_survey } = req.body;
 
-    const data = await surveyService.updatePertanyaan(id, { pertanyaan, status, urutan });
+    const data = await surveyService.updatePertanyaan(id, { pertanyaan, status, urutan, tipe_survey });
     if (!data) {
       return res.status(404).json({
         success: false,
@@ -126,7 +126,8 @@ const remove = async (req, res) => {
 // Admin: Ambil data statistik dan grafik kepuasan user
 const getStatistik = async (req, res) => {
   try {
-    const data = await surveyService.getStatistikGrafik();
+    const { tipe = "layanan" } = req.query;
+    const data = await surveyService.getStatistikGrafik(tipe);
     return res.status(200).json({
       success: true,
       message: "Statistik kepuasan layanan berhasil diambil",
@@ -144,7 +145,8 @@ const getStatistik = async (req, res) => {
 // Public: Ambil pertanyaan aktif untuk modal survey di landing page
 const getPublicPertanyaan = async (req, res) => {
   try {
-    const data = await surveyService.getActivePertanyaan();
+    const { tipe = "layanan" } = req.query;
+    const data = await surveyService.getActivePertanyaan(tipe);
     return res.status(200).json({
       success: true,
       data,
@@ -161,9 +163,7 @@ const getPublicPertanyaan = async (req, res) => {
 // Public: Simpan jawaban responden dari modal survey di landing page
 const submitPublicJawaban = async (req, res) => {
   try {
-    const { answers } = req.body;
-    // answers bisa array [{ survey_pertanyaan_id: 1, jawaban: 'Sangat Baik' }, ...]
-    // atau single object { survey_pertanyaan_id, jawaban }
+    const { answers, dokumen_hukum_id = null } = req.body;
 
     const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "";
     const userAgent = req.headers["user-agent"] || "";
@@ -174,6 +174,7 @@ const submitPublicJawaban = async (req, res) => {
           await surveyService.submitJawaban({
             survey_pertanyaan_id: item.survey_pertanyaan_id,
             jawaban: item.jawaban,
+            dokumen_hukum_id: item.dokumen_hukum_id || dokumen_hukum_id || null,
             ip_address: ip,
             user_agent: userAgent,
           });
@@ -183,6 +184,7 @@ const submitPublicJawaban = async (req, res) => {
       await surveyService.submitJawaban({
         survey_pertanyaan_id: req.body.survey_pertanyaan_id,
         jawaban: req.body.jawaban,
+        dokumen_hukum_id: req.body.dokumen_hukum_id || dokumen_hukum_id || null,
         ip_address: ip,
         user_agent: userAgent,
       });
@@ -195,7 +197,7 @@ const submitPublicJawaban = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Terima kasih atas partisipasi Anda dalam survey layanan JDIH!",
+      message: "Terima kasih atas partisipasi Anda dalam survey JDIH!",
     });
   } catch (error) {
     return res.status(500).json({

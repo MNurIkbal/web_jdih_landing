@@ -35,6 +35,7 @@ import {
   Edit3,
   Scale,
   User,
+  ChevronLeft,
 } from "lucide-react";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
@@ -77,10 +78,12 @@ import {
   PembahasanRapatSchema,
   UploadRevisedDraftPdfSchema,
   PenunjukanPejabatSchema,
+  PenetapanPublikasiSchema,
   type PengajuanPeraturanFormValues,
   type VerifikasiPengajuanFormValues,
   type PembahasanRapatFormValues,
   type PenunjukanPejabatFormValues,
+  type PenetapanPublikasiFormValues,
 } from "../schema/PengajuanPeraturan.schema";
 import {
   fetchMasterOptions,
@@ -433,127 +436,413 @@ export default function PengajuanPeraturanComponent({
   return (
     <main className="p-4 sm:p-6 lg:p-8 space-y-6">
       {activeMainTab === "monitoring" ? (
-        /* TAMPILAN MONITORING PROGRES */
+        /* TAMPILAN MONITORING PROGRES BERBASIS KARTU INTERAKTIF & MODERN UIX */
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
-            <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-              <Activity className="text-blue-600" size={20} />
-              <span>Monitoring Real-time Tahapan & Progres Dokumen Hukum</span>
-            </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Pantau perjalanan dan tahapan seluruh permohonan rancangan produk hukum dari Pengajuan, Pembahasan, Harmonisasi, Persetujuan, hingga Penetapan & Pengundangan.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {items.map((row) => {
-              const currentStepIdx = TAHAPAN_STEPS.findIndex((s) => s.stage === row.tahapan);
-              const progressPercentage = Math.round(((currentStepIdx + 1) / TAHAPAN_STEPS.length) * 100);
-
-              return (
-                <div
-                  key={row.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-blue-300 transition"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200">
-                          {row.kategori || "Peraturan"}
-                        </span>
-                        <span className="text-xs text-slate-400">•</span>
-                        <span className="text-xs text-slate-500">
-                          Nomor: <strong className="text-slate-700">{row.nomor_rancangan || "-"}</strong>
-                        </span>
-                        <span className="text-xs text-slate-400">•</span>
-                        <span className="text-xs text-slate-500">Tahun {row.tahun || "-"}</span>
-                      </div>
-                      <h4 className="mt-1.5 text-sm font-bold text-slate-900">{row.judul}</h4>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setDetailModalData(row)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs cursor-pointer"
-                      >
-                        <Eye size={13} />
-                        <span>Detail Form</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedId(row.id)}
-                        className="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 shadow-xs cursor-pointer"
-                      >
-                        <ArrowRight size={13} />
-                        <span>Kelola Tahapan</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Visual 5 Stages Progress Tracker */}
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2">
-                      <span className="flex items-center gap-1.5">
-                        <span>Tahap Saat Ini:</span>
-                        <strong className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                          {row.tahapan}
-                        </strong>
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span>Status:</span>
-                        <strong
-                          className={`px-2 py-0.5 rounded-md border text-[11px] ${row.status === "Draft"
-                              ? "bg-slate-100 text-slate-700 border-slate-200"
-                              : row.status === "Submit Dokumen" || row.status === "Review"
-                                ? "bg-amber-50 text-amber-800 border-amber-200"
-                                : row.status === "Revisi"
-                                  ? "bg-rose-50 text-rose-700 border-rose-200"
-                                  : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                            }`}
-                        >
-                          {row.status}
-                        </strong>
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-5 gap-2 pt-2">
-                      {TAHAPAN_STEPS.map((s, idx) => {
-                        const isDone = currentStepIdx > idx;
-                        const isCurrent = currentStepIdx === idx;
-                        return (
-                          <div
-                            key={s.number}
-                            className={`rounded-xl p-2.5 border text-center transition ${isCurrent
-                                ? "border-blue-500 bg-blue-50/70 text-blue-900 ring-1 ring-blue-500"
-                                : isDone
-                                  ? "border-emerald-200 bg-emerald-50/50 text-emerald-800"
-                                  : "border-slate-200 bg-slate-50/60 text-slate-400"
-                              }`}
-                          >
-                            <div className="flex items-center justify-center gap-1 text-[11px] font-bold">
-                              {isDone ? (
-                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                              ) : (
-                                <span
-                                  className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${isCurrent ? "bg-blue-600 text-white" : "bg-slate-300 text-slate-600"
-                                    }`}
-                                >
-                                  {s.number}
-                                </span>
-                              )}
-                              <span className="truncate">{s.label}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+          {/* Header Card dengan Stat Ringkasan */}
+          <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/30 p-6 sm:p-8 shadow-sm">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full bg-blue-100/80 px-3 py-1 text-xs font-bold text-blue-800">
+                  <Activity size={14} className="text-blue-600 animate-pulse" />
+                  <span>Real-time Timeline Tracking</span>
                 </div>
-              );
-            })}
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  Monitoring Progres & Alur 5 Tahapan Regulasi
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+                  Pantau pergerakan rancangan produk hukum dari perumusan awal, notulensi pembahasan, harmonisasi keselarasan norma, persetujuan pejabat, hingga pengundangan resmi.
+                </p>
+              </div>
+
+              {/* Total Card Counter */}
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="rounded-2xl border border-white bg-white/80 backdrop-blur-md px-5 py-3.5 shadow-sm text-center min-w-[110px]">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Draf</span>
+                  <span className="text-2xl font-black text-blue-700">{totalElements}</span>
+                </div>
+                <div className="rounded-2xl border border-white bg-white/80 backdrop-blur-md px-5 py-3.5 shadow-sm text-center min-w-[110px]">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Halaman</span>
+                  <span className="text-2xl font-black text-slate-800">{page} <span className="text-sm font-semibold text-slate-400">/ {totalPages}</span></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Background Decorative Blur */}
+            <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-indigo-400/10 blur-2xl pointer-events-none" />
           </div>
+
+          {/* Filter Bar: Pencarian, Filter Tahapan, & Sort */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-3">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search Bar Modern */}
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Cari judul rancangan peraturan, nomor draf, atau pemrakarsa..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 py-2.5 text-xs font-medium text-slate-800 placeholder:text-slate-400 transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setPage(1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Action Buttons: Refresh & Pilihan Page Size */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  disabled={isLoading || isFetching}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                  title="Muat ulang data"
+                >
+                  <RefreshCw size={13} className={isLoading || isFetching ? "animate-spin text-blue-600" : "text-slate-500"} />
+                  <span className="hidden sm:inline">Segarkan</span>
+                </button>
+
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 pl-1">
+                  <span className="hidden sm:inline">Tampilkan:</span>
+                  <select
+                    value={size}
+                    onChange={(e) => {
+                      setSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-700 transition focus:border-blue-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value={5}>5 per halaman</option>
+                    <option value={10}>10 per halaman</option>
+                    <option value={20}>20 per halaman</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Filter Chips Tahapan */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin pt-1 border-t border-slate-100">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">
+                Filter Tahap:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setTahapanFilter("");
+                  setPage(1);
+                }}
+                className={`rounded-xl px-3 py-1 text-xs font-bold transition shrink-0 cursor-pointer ${
+                  !tahapanFilter
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+                }`}
+              >
+                Semua Tahap
+              </button>
+              {TAHAPAN_STEPS.map((s) => {
+                const isSelected = tahapanFilter === s.stage;
+                return (
+                  <button
+                    key={s.number}
+                    type="button"
+                    onClick={() => {
+                      setTahapanFilter(isSelected ? "" : s.stage);
+                      setPage(1);
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-bold transition shrink-0 cursor-pointer ${
+                      isSelected
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+                    }`}
+                  >
+                    <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"}`}>
+                      {s.number}
+                    </span>
+                    <span>{s.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* List Card Progres Modern */}
+          {isLoading || isFetching ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-xs">
+              <div className="inline-flex h-10 w-10 animate-spin items-center justify-center rounded-full border-2 border-blue-600 border-t-transparent text-blue-600 mb-3" />
+              <p className="text-xs font-bold text-slate-700">Memuat data monitoring progres...</p>
+              <p className="text-[11px] text-slate-400 mt-1">Menghubungkan ke basis data dokumen hukum</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-xs">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mb-3">
+                <FileText size={26} />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800">Tidak Ada Data Dokumen Ditemukan</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                {search
+                  ? `Tidak ada rancangan peraturan yang cocok dengan kata kunci "${search}".`
+                  : "Belum ada draf rancangan peraturan dalam tahapan ini."}
+              </p>
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                >
+                  <RefreshCw size={12} />
+                  <span>Reset Pencarian</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {items.map((row) => {
+                const currentStepIdx = TAHAPAN_STEPS.findIndex((s) => s.stage === row.tahapan);
+                const progressPercentage = Math.round(((currentStepIdx + 1) / TAHAPAN_STEPS.length) * 100);
+
+                const isRejectedOrRevision =
+                  row.status === "Perlu Perbaikan Harmonisasi" ||
+                  row.status === "Revisi" ||
+                  row.status === "Ditolak";
+
+                return (
+                  <div
+                    key={row.id}
+                    className="group rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:border-blue-300 hover:shadow-md transition-all duration-200"
+                  >
+                    {/* Header Item Card */}
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
+                      <div className="space-y-1.5 max-w-3xl">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-lg bg-blue-50 px-2.5 py-0.5 text-[11px] font-extrabold text-blue-700 border border-blue-200/80">
+                            {row.kategori || "Peraturan"}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-xs font-medium text-slate-500">
+                            Nomor Draf: <strong className="text-slate-800 font-bold">{row.nomor_rancangan || "-"}</strong>
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-xs font-medium text-slate-500">
+                            Tahun: <strong className="text-slate-800 font-bold">{row.tahun || "-"}</strong>
+                          </span>
+                          {row.pemrakarsa && (
+                            <>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-xs font-medium text-slate-500">
+                                Pemrakarsa: <strong className="text-slate-800 font-bold">{row.pemrakarsa}</strong>
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        <h4 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-blue-700 transition leading-snug">
+                          {row.judul}
+                        </h4>
+                      </div>
+
+                      {/* Tombol Aksi Detail & Kelola Tahapan */}
+                      <div className="flex items-center gap-2.5 shrink-0 self-start lg:self-center">
+                        <button
+                          type="button"
+                          onClick={() => setDetailModalData(row)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition cursor-pointer"
+                        >
+                          <Eye size={14} className="text-slate-500" />
+                          <span>Detail Form</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedId(row.id)}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20 transition cursor-pointer"
+                        >
+                          <span>Kelola Tahapan</span>
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar & Status Badges */}
+                    <div className="mt-4 pt-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-500">Tahap Berjalan:</span>
+                          <span className="rounded-lg bg-blue-50 px-2.5 py-0.5 text-xs font-extrabold text-blue-800 border border-blue-200">
+                            Tahap {currentStepIdx + 1}: {row.tahapan}
+                          </span>
+                          <span className="text-xs text-slate-400 font-medium">({progressPercentage}% Selesai)</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-500">Status Dokumen:</span>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-lg border text-[11px] font-extrabold ${
+                              isRejectedOrRevision
+                                ? "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
+                                : row.status === "Draft"
+                                ? "bg-slate-100 text-slate-700 border-slate-200"
+                                : row.status === "Submit Dokumen" || row.status === "Review"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            }`}
+                          >
+                            {row.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Line Progress Bar Visual */}
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-4">
+                        <div
+                          className={`h-full transition-all duration-500 rounded-full ${
+                            isRejectedOrRevision
+                              ? "bg-gradient-to-r from-blue-500 via-amber-500 to-rose-500"
+                              : "bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500"
+                          }`}
+                          style={{ width: `${progressPercentage}%` }}
+                        />
+                      </div>
+
+                      {/* Visual 5 Stages Stepper Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5">
+                        {TAHAPAN_STEPS.map((s, idx) => {
+                          const isDone = currentStepIdx > idx;
+                          const isCurrent = currentStepIdx === idx;
+
+                          return (
+                            <div
+                              key={s.number}
+                              className={`rounded-2xl p-3 border text-left transition-all ${
+                                isCurrent
+                                  ? isRejectedOrRevision
+                                    ? "border-rose-400 bg-rose-50/70 text-rose-950 ring-1 ring-rose-400 shadow-xs"
+                                    : "border-blue-500 bg-blue-50/70 text-blue-950 ring-1 ring-blue-500 shadow-xs"
+                                  : isDone
+                                  ? "border-emerald-200 bg-emerald-50/50 text-emerald-900"
+                                  : "border-slate-100 bg-slate-50/60 text-slate-400"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span
+                                  className={`flex h-5 w-5 items-center justify-center rounded-lg text-[10px] font-black ${
+                                    isDone
+                                      ? "bg-emerald-600 text-white"
+                                      : isCurrent
+                                      ? isRejectedOrRevision
+                                        ? "bg-rose-600 text-white"
+                                        : "bg-blue-600 text-white"
+                                      : "bg-slate-200 text-slate-500"
+                                  }`}
+                                >
+                                  {isDone ? <Check size={11} strokeWidth={3} /> : s.number}
+                                </span>
+                                {isDone ? (
+                                  <span className="text-[10px] font-extrabold text-emerald-600">Selesai</span>
+                                ) : isCurrent ? (
+                                  <span
+                                    className={`text-[10px] font-extrabold ${
+                                      isRejectedOrRevision ? "text-rose-600" : "text-blue-600"
+                                    }`}
+                                  >
+                                    Aktif
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-slate-400">Menunggu</span>
+                                )}
+                              </div>
+                              <p className="truncate text-xs font-bold leading-tight mt-1">{s.label}</p>
+                              <p className="truncate text-[10px] text-slate-400 mt-0.5">{s.desc}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pagination Controls Modern (Non-Table) */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+              <div className="text-xs text-slate-500">
+                Menampilkan <strong className="text-slate-800">{(page - 1) * size + 1}</strong> -{" "}
+                <strong className="text-slate-800">{Math.min(page * size, totalElements)}</strong> dari{" "}
+                <strong className="text-slate-800">{totalElements}</strong> draf regulasi
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={page <= 1}
+                  className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  <ChevronLeft size={14} />
+                  <span>Sebelumnya</span>
+                </button>
+
+                <div className="flex items-center gap-1 px-2">
+                  {Array.from({ length: totalPages }).map((_, i) => {
+                    const pageNum = i + 1;
+                    const isCurrent = page === pageNum;
+                    // Tampilkan maksimal 5 tombol halaman
+                    if (
+                      pageNum === 1 ||
+                      pageNum === totalPages ||
+                      (pageNum >= page - 1 && pageNum <= page + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setPage(pageNum)}
+                          className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black transition cursor-pointer ${
+                            isCurrent
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (pageNum === page - 2 || pageNum === page + 2) {
+                      return (
+                        <span key={pageNum} className="text-slate-400 px-1 text-xs">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={page >= totalPages}
+                  className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  <span>Berikutnya</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Tabel Utama menggunakan DataTable standar sistem */
@@ -4082,26 +4371,60 @@ function TabPenetapan({
 }) {
   const { mutate: penetapanPublikasi, isPending } = useSubmitPenetapanPublikasi();
 
+  // Nilai otomatis diambil dari data form awal pengajuan
   const [nomorPenetapan, setNomorPenetapan] = useState(
     draft.nomor_penetapan || draft.nomor_rancangan || ""
   );
-  const [tanggalPenetapan, setTanggalPenetapan] = useState(
-    draft.tanggal_penetapan ? draft.tanggal_penetapan.split("T")[0] : new Date().toISOString().split("T")[0]
+  const [tanggalPenetapan, setTanggalPenetapan] = useState(() => {
+    if (draft.tanggal_penetapan) return draft.tanggal_penetapan.split("T")[0];
+    if (draft.target_penetapan) return draft.target_penetapan.split("T")[0];
+    if (draft.tanggal_pengajuan) return draft.tanggal_pengajuan.split("T")[0];
+    return new Date().toISOString().split("T")[0];
+  });
+  const [tempatPenetapan, setTempatPenetapan] = useState(
+    draft.tempat_penetapan || "Jakarta"
   );
-  const [tempatPenetapan, setTempatPenetapan] = useState("Jakarta");
-  const [fileDokumenFinal, setFileDokumenFinal] = useState<File | null>(null);
+  const [formErrors, setFormErrors] = useState<{
+    nomor_penetapan?: string;
+    tanggal_penetapan?: string;
+    tempat_penetapan?: string;
+  }>({});
 
   const isPublished = draft.status === "Ditetapkan" || !!draft.id_dokumen_hukum_terbit;
 
   const handlePenetapan = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomorPenetapan.trim()) return;
+    setFormErrors({});
+
+    const validationResult = PenetapanPublikasiSchema.safeParse({
+      nomor_penetapan: nomorPenetapan,
+      tanggal_penetapan: tanggalPenetapan,
+      tempat_penetapan: tempatPenetapan,
+    });
+
+    if (!validationResult.success) {
+      const fieldErrors: {
+        nomor_penetapan?: string;
+        tanggal_penetapan?: string;
+        tempat_penetapan?: string;
+      } = {};
+      const issues = validationResult.error.issues || (validationResult.error as any).errors || [];
+      issues.forEach((err: any) => {
+        const field = err.path?.[0] as keyof typeof fieldErrors;
+        if (field && !fieldErrors[field]) {
+          fieldErrors[field] = err.message;
+        }
+      });
+      setFormErrors(fieldErrors);
+      const firstMsg = issues[0]?.message || "Silakan lengkapi formulir penetapan";
+      toast.error(firstMsg);
+      return;
+    }
 
     const fd = new FormData();
-    fd.append("nomor_penetapan", nomorPenetapan);
+    fd.append("nomor_penetapan", nomorPenetapan.trim());
     fd.append("tanggal_penetapan", tanggalPenetapan);
-    fd.append("tempat_penetapan", tempatPenetapan);
-    if (fileDokumenFinal) fd.append("file_dokumen_final", fileDokumenFinal);
+    fd.append("tempat_penetapan", tempatPenetapan.trim());
 
     penetapanPublikasi(
       { draftId: draft.id, formData: fd },
@@ -4120,7 +4443,7 @@ function TabPenetapan({
           Tahap 5: Penetapan & Publikasi ke Landing Page Internal
         </h4>
         <p className="mt-1 text-xs text-emerald-700">
-          Setelah semua tahapan terpenuhi, lakukan penetapan resmi. Dokumen hukum secara otomatis dipublikasikan ke repositori <strong>Dokumen Hukum Internal</strong> saja.
+          Setelah semua tahapan terpenuhi, lakukan penetapan resmi. Dokumen hukum secara otomatis dipublikasikan ke repositori <strong>Dokumen Hukum Internal</strong> menggunakan berkas draf final yang telah diselaraskan.
         </p>
       </div>
 
@@ -4153,62 +4476,83 @@ function TabPenetapan({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-semibold text-slate-700">
-                Nomor *
+                Nomor Peraturan Resmi (Penetapan) <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
-                required
                 value={nomorPenetapan}
-                onChange={(e) => setNomorPenetapan(e.target.value)}
+                onChange={(e) => {
+                  setNomorPenetapan(e.target.value);
+                  setFormErrors((prev) => ({ ...prev, nomor_penetapan: undefined }));
+                }}
                 placeholder="Contoh: PER-05/BIN/2026"
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                className={`mt-1 w-full rounded-xl border px-3.5 py-2 text-sm transition focus:outline-none ${
+                  formErrors.nomor_penetapan
+                    ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
+                    : "border-slate-200 focus:border-blue-500"
+                }`}
               />
+              {formErrors.nomor_penetapan && (
+                <p className="mt-1 text-[11px] text-rose-500 font-medium">
+                  {formErrors.nomor_penetapan}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700">
-                Tanggal Penetapan
+                Tanggal Penetapan <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
                 value={tanggalPenetapan}
-                onChange={(e) => setTanggalPenetapan(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                onChange={(e) => {
+                  setTanggalPenetapan(e.target.value);
+                  setFormErrors((prev) => ({ ...prev, tanggal_penetapan: undefined }));
+                }}
+                className={`mt-1 w-full rounded-xl border px-3.5 py-2 text-sm transition focus:outline-none ${
+                  formErrors.tanggal_penetapan
+                    ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
+                    : "border-slate-200 focus:border-blue-500"
+                }`}
               />
+              {formErrors.tanggal_penetapan && (
+                <p className="mt-1 text-[11px] text-rose-500 font-medium">
+                  {formErrors.tanggal_penetapan}
+                </p>
+              )}
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700">
-              Tempat Penetapan
+              Tempat Penetapan <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={tempatPenetapan}
-              onChange={(e) => setTempatPenetapan(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              onChange={(e) => {
+                setTempatPenetapan(e.target.value);
+                setFormErrors((prev) => ({ ...prev, tempat_penetapan: undefined }));
+              }}
+              placeholder="Contoh: Jakarta"
+              className={`mt-1 w-full rounded-xl border px-3.5 py-2 text-sm transition focus:outline-none ${
+                formErrors.tempat_penetapan
+                  ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
+                  : "border-slate-200 focus:border-blue-500"
+              }`}
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Upload File Dokumen Resmi Final yang Sudah Bertandatangan (PDF)
-            </label>
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={(e) => setFileDokumenFinal(e.target.files?.[0] || null)}
-              className="mt-1 block text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-            />
-            <p className="mt-1 text-[11px] text-slate-400">
-              Jika tidak diunggah, sistem akan menggunakan file draft yang diunggah pada Tahap 1.
-            </p>
+            {formErrors.tempat_penetapan && (
+              <p className="mt-1 text-[11px] text-rose-500 font-medium">
+                {formErrors.tempat_penetapan}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end pt-3">
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50 transition cursor-pointer"
             >
               <FileCheck size={16} />
               {isPending ? "Memproses Penetapan..." : "Tetapkan & Publikasikan ke Internal"}

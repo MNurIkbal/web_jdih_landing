@@ -102,9 +102,7 @@ export const PengajuanPeraturanSchema = z.object({
 export type PengajuanPeraturanFormValues = z.infer<typeof PengajuanPeraturanSchema>;
 
 export const VerifikasiPengajuanSchema = z.object({
-  status: z.enum(["Disetujui", "Ditolak"], {
-    errorMap: () => ({ message: "Pilih keputusan verifikasi" }),
-  }),
+  status: z.enum(["Disetujui", "Ditolak"]),
   catatan: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.status === "Ditolak" && (!data.catatan || !data.catatan.trim())) {
@@ -120,12 +118,12 @@ export type VerifikasiPengajuanFormValues = z.infer<typeof VerifikasiPengajuanSc
 
 export const PembahasanRapatSchema = z.object({
   judul_rapat: z
-    .string({ required_error: "Judul rapat / agenda wajib diisi" })
+    .string()
     .trim()
     .min(1, "Judul rapat / agenda wajib diisi")
     .max(255, "Judul rapat maksimal 255 karakter"),
   tanggal_rapat: z
-    .string({ required_error: "Tanggal rapat wajib diisi" })
+    .string()
     .min(1, "Tanggal rapat wajib diisi"),
   lokasi: z.string().trim().max(255, "Lokasi maksimal 255 karakter").optional(),
   keterangan: z.string().trim().optional(),
@@ -166,7 +164,7 @@ export type UploadRevisedDraftPdfFormValues = z.infer<typeof UploadRevisedDraftP
 
 export const PenunjukanPejabatSchema = z.object({
   user_id: z
-    .string({ required_error: "Pilih pejabat / admin terlebih dahulu" })
+    .string()
     .trim()
     .min(1, "Pilih pejabat / admin terlebih dahulu"),
   nama_pejabat: z.string().trim().optional(),
@@ -174,5 +172,24 @@ export const PenunjukanPejabatSchema = z.object({
 });
 
 export type PenunjukanPejabatFormValues = z.infer<typeof PenunjukanPejabatSchema>;
+
+export const PenetapanPublikasiSchema = z.object({
+  nomor_penetapan: z
+    .string()
+    .trim()
+    .min(1, "Nomor peraturan resmi wajib diisi")
+    .max(100, "Nomor peraturan resmi maksimal 100 karakter"),
+  tanggal_penetapan: z
+    .string()
+    .trim()
+    .min(1, "Tanggal penetapan wajib diisi"),
+  tempat_penetapan: z
+    .string()
+    .trim()
+    .min(1, "Tempat penetapan wajib diisi")
+    .max(255, "Tempat penetapan maksimal 255 karakter"),
+});
+
+export type PenetapanPublikasiFormValues = z.infer<typeof PenetapanPublikasiSchema>;
 
 

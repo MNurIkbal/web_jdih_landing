@@ -65,7 +65,16 @@ const update = async (id, data) => {
 };
 
 const getDokumenSummary = async () => {
-  const query = ` SELECT COUNT(*)::int AS total, COUNT(*) FILTER ( WHERE TRIM(kategori) = 'Keputusan' )::int AS Keputusan, COUNT(*) FILTER ( WHERE TRIM(kategori) = 'Peraturan' )::int AS Peraturan, COUNT(*) FILTER ( WHERE TRIM(kategori) = 'Perundang-Undangan' )::int AS Perundang_Undangan FROM dokumen_hukum WHERE deleted_at IS NULL `;
+  const query = `
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE LOWER(TRIM(kategori)) LIKE '%keputusan%')::int AS Keputusan,
+      COUNT(*) FILTER (WHERE LOWER(TRIM(kategori)) LIKE '%peraturan%')::int AS Peraturan,
+      COUNT(*) FILTER (WHERE LOWER(TRIM(kategori)) LIKE '%undang%')::int AS Perundang_Undangan,
+      COUNT(*) FILTER (WHERE LOWER(TRIM(kategori)) LIKE '%instruksi%')::int AS Instruksi
+    FROM dokumen_hukum
+    WHERE deleted_at IS NULL
+  `;
   const result = await pool.query(query);
   return result.rows[0];
 };
@@ -76,12 +85,30 @@ const getBeritaSummary = async () => {
   return result.rows[0];
 };
 
+const getPengajuanSummary = async () => {
+  const query = `
+    SELECT
+      COUNT(*)::int AS total_pengajuan,
+      COUNT(*) FILTER (WHERE tahapan = 'Pengajuan')::int AS tahap_pengajuan,
+      COUNT(*) FILTER (WHERE tahapan = 'Pembahasan')::int AS tahap_pembahasan,
+      COUNT(*) FILTER (WHERE tahapan = 'Harmonisasi')::int AS tahap_harmonisasi,
+      COUNT(*) FILTER (WHERE tahapan = 'Persetujuan')::int AS tahap_persetujuan,
+      COUNT(*) FILTER (WHERE tahapan = 'Penetapan')::int AS tahap_penetapan,
+      COUNT(*) FILTER (WHERE status = 'Ditetapkan')::int AS selesai_ditetapkan
+    FROM draft_peraturan
+    WHERE deleted_at IS NULL
+  `;
+  const result = await pool.query(query);
+  return result.rows[0];
+};
+
 const getSummary = async () => {
-  const [dokumen, berita] = await Promise.all([
+  const [dokumen, berita, pengajuan] = await Promise.all([
     getDokumenSummary(),
     getBeritaSummary(),
+    getPengajuanSummary(),
   ]);
-  return { dokumen, berita };
+  return { dokumen, berita, pengajuan };
 };
 
 const getDokumenSummaryKategori = async () => {

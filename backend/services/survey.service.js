@@ -1,4 +1,4 @@
-const pool = require("../config/database");
+const pool = require('../config/database');
 
 const ensureTable = async () => {
   try {
@@ -9,9 +9,15 @@ const ensureTable = async () => {
         pertanyaan TEXT NOT NULL,
         status BOOLEAN DEFAULT true,
         urutan INT DEFAULT 0,
+        tipe_survey VARCHAR(50) DEFAULT 'layanan',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Pastikan kolom tipe_survey ada (migrasi backward-compatible)
+    await pool.query(`
+      ALTER TABLE survey_pertanyaan ADD COLUMN IF NOT EXISTS tipe_survey VARCHAR(50) DEFAULT 'layanan';
     `);
 
     // 2. Table Jawaban Survey dari Pengguna
@@ -21,20 +27,37 @@ const ensureTable = async () => {
         survey_pertanyaan_id INT REFERENCES survey_pertanyaan(survey_pertanyaan_id) ON DELETE CASCADE,
         jawaban VARCHAR(50) NOT NULL,
         nilai INT NOT NULL,
+        dokumen_hukum_id INT,
         ip_address VARCHAR(100),
         user_agent TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // Tambah default pertanyaan jika belum ada sama sekali
-    const check = await pool.query("SELECT COUNT(*) AS total FROM survey_pertanyaan");
-    if (Number(check.rows[0]?.total || 0) === 0) {
+    await pool.query(`
+      ALTER TABLE survey_jawaban ADD COLUMN IF NOT EXISTS dokumen_hukum_id INT;
+    `);
+
+    // Tambah default pertanyaan layanan jika belum ada
+    const checkLayanan = await pool.query("SELECT COUNT(*) AS total FROM survey_pertanyaan WHERE tipe_survey = 'layanan' OR tipe_survey IS NULL");
+    if (Number(checkLayanan.rows[0]?.total || 0) === 0) {
       await pool.query(`
-        INSERT INTO survey_pertanyaan (pertanyaan, status, urutan)
+        INSERT INTO survey_pertanyaan (pertanyaan, status, urutan, tipe_survey)
         VALUES 
-          ('Bagaimana penilaian Anda terhadap kemudahan akses dan kelengkapan informasi hukum pada portal JDIH?', true, 1),
-          ('Bagaimana kualitas dan kecepatan layanan konsultasi / respon yang diberikan?', true, 2)
+          ('Bagaimana penilaian Anda terhadap kemudahan akses dan kelengkapan informasi hukum pada portal JDIH?', true, 1, 'layanan'),
+          ('Bagaimana kualitas dan kecepatan layanan konsultasi / respon yang diberikan?', true, 2, 'layanan')
+      `);
+    }
+
+    // Tambah default pertanyaan dokumen hukum jika belum ada
+    const checkDokumen = await pool.query("SELECT COUNT(*) AS total FROM survey_pertanyaan WHERE tipe_survey = 'dokumen'");
+    if (Number(checkDokumen.rows[0]?.total || 0) === 0) {
+      await pool.query(`
+        INSERT INTO survey_pertanyaan (pertanyaan, status, urutan, tipe_survey)
+        VALUES 
+          ('Bagaimana kemudahan dan kejelasan struktur naskah dokumen hukum yang diunduh?', true, 1, 'dokumen'),
+          ('Sejauh mana dokumen hukum ini memenuhi kebutuhan referensi dan keabsahan hukum Anda?', true, 2, 'dokumen'),
+          ('Bagaimana kualitas hasil unduhan file resmi (PDF) dokumen hukum ini?', true, 3, 'dokumen')
       `);
     }
   } catch (err) {
@@ -54,7 +77,7 @@ const NILAI_MAP = {
 };
 
 // CRUD Pertanyaan (Admin)
-const getAllPertanyaan = async ({ search = "", page = 0, size = 10 } = {}) => {
+const getAllPertanyaan = async ({ search = "", tipe = "layanan", page = 0, size = 10 } = {}) => {
   let pageNum = Number(page);
   if (isNaN(pageNum) || pageNum < 0) pageNum = 0;
   size = Number(size) || 10;
@@ -63,6 +86,11 @@ const getAllPertanyaan = async ({ search = "", page = 0, size = 10 } = {}) => {
 
   const params = [];
   let whereClauses = [];
+
+  if (tipe && tipe !== "all") {
+    params.push(tipe);
+    whereClauses.push(`(tipe_survey = $${params.length}${tipe === 'layanan' ? ' OR tipe_survey IS NULL' : ''})`);
+  }
 
   if (search && search.trim()) {
     params.push(`%${search.trim()}%`);
@@ -81,24 +109,21 @@ const getAllPertanyaan = async ({ search = "", page = 0, size = 10 } = {}) => {
 
   const countQuery = `SELECT COUNT(*) AS total FROM survey_pertanyaan ${whereStr}`;
 
-  const [dataResult, countResult] = await Promise.all([
+  const [dataRes, countRes] = await Promise.all([
     pool.query(dataQuery, dataParams),
     pool.query(countQuery, params),
   ]);
 
-  const total = Number(countResult.rows[0]?.total || 0);
-  const totalPages = total > 0 ? Math.ceil(total / size) : 0;
+  const totalElements = Number(countRes.rows[0]?.total || 0);
+  const totalPages = Math.ceil(totalElements / size);
 
   return {
-    data: dataResult.rows,
+    data: dataRes.rows,
     pagination: {
       page: pageNum,
       size,
-      total,
-      totalElements: total,
+      totalElements,
       totalPages,
-      hasNext: pageNum + 1 < totalPages,
-      hasPrevious: pageNum > 0,
     },
   };
 };
@@ -111,37 +136,40 @@ const getPertanyaanById = async (id) => {
   return result.rows[0] || null;
 };
 
-const createPertanyaan = async ({ pertanyaan, status = true, urutan = 0 }) => {
-  const statusVal = status === true || status === "true" || status === 1 || status === "1";
+const createPertanyaan = async ({ pertanyaan, status = true, urutan = 0, tipe_survey = "layanan" }) => {
+  const cleanPertanyaan = String(pertanyaan || "").trim();
+  const statusVal = Boolean(status);
+  const urutanVal = Number(urutan) || 0;
+  const cleanTipe = String(tipe_survey || "layanan").trim();
+
   const result = await pool.query(
     `
-      INSERT INTO survey_pertanyaan (pertanyaan, status, urutan)
-      VALUES ($1, $2, $3)
+      INSERT INTO survey_pertanyaan (pertanyaan, status, urutan, tipe_survey)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
     `,
-    [pertanyaan ? pertanyaan.trim() : "", statusVal, Number(urutan) || 0]
+    [cleanPertanyaan, statusVal, urutanVal, cleanTipe]
   );
   return result.rows[0];
 };
 
-const updatePertanyaan = async (id, { pertanyaan, status, urutan }) => {
-  const old = await getPertanyaanById(id);
-  if (!old) return null;
+const updatePertanyaan = async (id, { pertanyaan, status, urutan, tipe_survey }) => {
+  const existing = await getPertanyaanById(id);
+  if (!existing) return null;
 
-  const newPertanyaan = pertanyaan !== undefined ? pertanyaan.trim() : old.pertanyaan;
-  const statusVal = status !== undefined
-    ? status === true || status === "true" || status === 1 || status === "1"
-    : old.status;
-  const urutanVal = urutan !== undefined ? Number(urutan) : old.urutan;
+  const newPertanyaan = pertanyaan !== undefined ? String(pertanyaan).trim() : existing.pertanyaan;
+  const statusVal = status !== undefined ? Boolean(status) : existing.status;
+  const urutanVal = urutan !== undefined ? Number(urutan) : existing.urutan;
+  const cleanTipe = tipe_survey !== undefined ? String(tipe_survey).trim() : existing.tipe_survey || "layanan";
 
   const result = await pool.query(
     `
       UPDATE survey_pertanyaan
-      SET pertanyaan = $1, status = $2, urutan = $3, updated_at = CURRENT_TIMESTAMP
-      WHERE survey_pertanyaan_id = $4
+      SET pertanyaan = $1, status = $2, urutan = $3, tipe_survey = $4, updated_at = CURRENT_TIMESTAMP
+      WHERE survey_pertanyaan_id = $5
       RETURNING *
     `,
-    [newPertanyaan, statusVal, urutanVal, id]
+    [newPertanyaan, statusVal, urutanVal, cleanTipe, id]
   );
   return result.rows[0];
 };
@@ -154,52 +182,60 @@ const removePertanyaan = async (id) => {
   return result.rows[0] || null;
 };
 
-// Public: Ambil pertanyaan aktif untuk ditampilkan di modal popup
-const getActivePertanyaan = async () => {
+// Public: Ambil pertanyaan aktif untuk modal survey berdasarkan tipe (layanan / dokumen)
+const getActivePertanyaan = async (tipe = "layanan") => {
+  const cleanTipe = String(tipe || "layanan").trim();
   const result = await pool.query(
     `
-      SELECT survey_pertanyaan_id, pertanyaan, urutan
+      SELECT survey_pertanyaan_id, pertanyaan, urutan, tipe_survey
       FROM survey_pertanyaan
-      WHERE status = true
+      WHERE status = true AND (tipe_survey = $1 OR ($1 = 'layanan' AND tipe_survey IS NULL))
       ORDER BY urutan ASC, survey_pertanyaan_id ASC
-    `
+    `,
+    [cleanTipe]
   );
   return result.rows;
 };
 
 // Public: Submit survey jawaban
-const submitJawaban = async ({ survey_pertanyaan_id, jawaban, ip_address = "", user_agent = "" }) => {
+const submitJawaban = async ({ survey_pertanyaan_id, jawaban, dokumen_hukum_id = null, ip_address = "", user_agent = "" }) => {
   const cleanJawaban = String(jawaban || "").trim();
   const nilai = NILAI_MAP[cleanJawaban] || 3;
 
   const result = await pool.query(
     `
-      INSERT INTO survey_jawaban (survey_pertanyaan_id, jawaban, nilai, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO survey_jawaban (survey_pertanyaan_id, jawaban, nilai, dokumen_hukum_id, ip_address, user_agent)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `,
-    [survey_pertanyaan_id, cleanJawaban, nilai, ip_address, user_agent]
+    [survey_pertanyaan_id, cleanJawaban, nilai, dokumen_hukum_id, ip_address, user_agent]
   );
   return result.rows[0];
 };
 
 // Statistik & Grafik Kepuasan Pengguna
-const getStatistikGrafik = async () => {
+const getStatistikGrafik = async (tipe = "layanan") => {
+  const cleanTipe = String(tipe || "layanan").trim();
+
   // 1. Ringkasan Keseluruhan Berdasarkan Opsi Jawaban
   const summaryQuery = `
     SELECT 
-      jawaban, 
+      j.jawaban, 
       COUNT(*) AS total
-    FROM survey_jawaban
-    GROUP BY jawaban
+    FROM survey_jawaban j
+    JOIN survey_pertanyaan p ON j.survey_pertanyaan_id = p.survey_pertanyaan_id
+    WHERE (p.tipe_survey = $1 OR ($1 = 'layanan' AND p.tipe_survey IS NULL))
+    GROUP BY j.jawaban
   `;
 
   // 2. Total Responden & Rata-rata Skor
   const scoreQuery = `
     SELECT 
       COUNT(*) AS total_responden,
-      COALESCE(AVG(nilai), 0) AS rata_rata_skor
-    FROM survey_jawaban
+      COALESCE(AVG(j.nilai), 0) AS rata_rata_skor
+    FROM survey_jawaban j
+    JOIN survey_pertanyaan p ON j.survey_pertanyaan_id = p.survey_pertanyaan_id
+    WHERE (p.tipe_survey = $1 OR ($1 = 'layanan' AND p.tipe_survey IS NULL))
   `;
 
   // 3. Rincian per Pertanyaan
@@ -207,6 +243,7 @@ const getStatistikGrafik = async () => {
     SELECT 
       p.survey_pertanyaan_id,
       p.pertanyaan,
+      p.tipe_survey,
       COUNT(j.survey_jawaban_id) AS total_jawaban,
       COALESCE(ROUND(AVG(j.nilai)::numeric, 2), 0) AS rata_rata,
       COUNT(CASE WHEN j.jawaban = 'Sangat Baik' THEN 1 END) AS sangat_baik,
@@ -216,14 +253,15 @@ const getStatistikGrafik = async () => {
       COUNT(CASE WHEN j.jawaban = 'Kurang Sekali' THEN 1 END) AS kurang_sekali
     FROM survey_pertanyaan p
     LEFT JOIN survey_jawaban j ON p.survey_pertanyaan_id = j.survey_pertanyaan_id
-    GROUP BY p.survey_pertanyaan_id, p.pertanyaan
+    WHERE (p.tipe_survey = $1 OR ($1 = 'layanan' AND p.tipe_survey IS NULL))
+    GROUP BY p.survey_pertanyaan_id, p.pertanyaan, p.tipe_survey
     ORDER BY p.urutan ASC, p.survey_pertanyaan_id ASC
   `;
 
   const [summaryRes, scoreRes, perPertanyaanRes] = await Promise.all([
-    pool.query(summaryQuery),
-    pool.query(scoreQuery),
-    pool.query(perPertanyaanQuery),
+    pool.query(summaryQuery, [cleanTipe]),
+    pool.query(scoreQuery, [cleanTipe]),
+    pool.query(perPertanyaanQuery, [cleanTipe]),
   ]);
 
   const defaultCounts = {
@@ -245,19 +283,22 @@ const getStatistikGrafik = async () => {
   const persentaseKepuasan = totalResponden > 0 ? (rataRataSkor / 5) * 100 : 0;
 
   return {
+    tipe_survey: cleanTipe,
     totalResponden,
     rataRataSkor: Number(rataRataSkor.toFixed(2)),
     persentaseKepuasan: Number(persentaseKepuasan.toFixed(1)),
     distribusiJawaban: defaultCounts,
-    perPertanyaan: perPertanyaanRes.rows.map((r) => ({
-      ...r,
-      total_jawaban: Number(r.total_jawaban),
-      rata_rata: Number(r.rata_rata),
-      sangat_baik: Number(r.sangat_baik),
-      baik: Number(r.baik),
-      cukup: Number(r.cukup),
-      kurang: Number(r.kurang),
-      kurang_sekali: Number(r.kurang_sekali),
+    perPertanyaan: perPertanyaanRes.rows.map((row) => ({
+      survey_pertanyaan_id: Number(row.survey_pertanyaan_id),
+      pertanyaan: row.pertanyaan,
+      tipe_survey: row.tipe_survey || "layanan",
+      total_jawaban: Number(row.total_jawaban || 0),
+      rata_rata: Number(row.rata_rata || 0),
+      sangat_baik: Number(row.sangat_baik || 0),
+      baik: Number(row.baik || 0),
+      cukup: Number(row.cukup || 0),
+      kurang: Number(row.kurang || 0),
+      kurang_sekali: Number(row.kurang_sekali || 0),
     })),
   };
 };

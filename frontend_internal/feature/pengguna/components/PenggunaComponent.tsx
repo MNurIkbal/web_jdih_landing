@@ -363,7 +363,7 @@ function PenggunaContent() {
               bg: "bg-blue-50",
               text: "text-blue-700",
               border: "border-blue-200",
-              label: "Admin Verifikator",
+              label: "Admin",
             },
             pengguna: {
               bg: "bg-emerald-50",

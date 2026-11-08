@@ -3,6 +3,8 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "sonner";
+import { SurveyPopup } from "@/components/survey-popup";
+import { SurveyDokumenPopup } from "@/components/survey-dokumen-popup";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -42,6 +44,8 @@ export default function RootLayout({
         <QueryProvider>
           <div className="flex-1">{children}</div>
           <Toaster position="top-right" richColors closeButton duration={2000} />
+          <SurveyPopup />
+          <SurveyDokumenPopup />
         </QueryProvider>
       </body>
     </html>

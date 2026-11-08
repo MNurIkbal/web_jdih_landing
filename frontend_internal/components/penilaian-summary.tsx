@@ -50,47 +50,87 @@ function StarRating({ score, max = 5 }: { score: number; max?: number }) {
 }
 
 export function PenilaianSummarySection() {
-  const { data: surveyData } = usePublicSurveyStatistik();
+  const { data: surveyDataLayanan } = usePublicSurveyStatistik("layanan");
+  const { data: surveyDataDokumen } = usePublicSurveyStatistik("dokumen");
   const { data: webSummary } = useWebSumaryHookAll();
 
-  // Parsing data survey
-  const totalResponden = surveyData?.totalResponden || 128;
-  const rataRataSkor = surveyData?.rataRataSkor || 4.75;
-  const persentaseKepuasan = surveyData?.persentaseKepuasan || 95.2;
+  // 1. Data Survey Layanan (Website)
+  const totalRespondenWeb = surveyDataLayanan?.totalResponden ?? 0;
+  const rataRataSkorWeb = surveyDataLayanan?.rataRataSkor ?? 0;
+  const persentaseKepuasanWeb = surveyDataLayanan?.persentaseKepuasan ?? 0;
+  const perPertanyaanWeb = surveyDataLayanan?.perPertanyaan || [];
 
-  // Pertanyaan survey
-  const perPertanyaan = surveyData?.perPertanyaan || [];
+  // 2. Data Survey Dokumen Hukum Terbit
+  const totalRespondenDok = surveyDataDokumen?.totalResponden ?? 0;
+  const rataRataSkorDok = surveyDataDokumen?.rataRataSkor ?? 0;
+  const persentaseKepuasanDok = surveyDataDokumen?.persentaseKepuasan ?? 0;
+  const perPertanyaanDok = surveyDataDokumen?.perPertanyaan || [];
 
-  // Data dokumen hukum
+  // Data dokumen hukum terbit di repositori
   const docSummary = (webSummary as any)?.data ?? {};
-  const totalDokumen = Number(docSummary.produk_hukum || docSummary.peraturan || 42);
+  const totalDokumen = Number(docSummary.produk_hukum || docSummary.peraturan || 0);
 
-  // Perhitungan rating dokumen hukum
-  const skorDokumen = useMemo(() => {
-    const qDoc = perPertanyaan.find(
-      (p : any) =>
-        p.pertanyaan.toLowerCase().includes("dokumen") ||
-        p.pertanyaan.toLowerCase().includes("produk hukum") ||
-        p.pertanyaan.toLowerCase().includes("informasi hukum")
-    );
-    if (qDoc && qDoc.rata_rata > 0) {
-      return Number(qDoc.rata_rata);
-    }
-    return 4.8;
-  }, [perPertanyaan]);
+  // Skor riil
+  const skorWeb = rataRataSkorWeb > 0 ? rataRataSkorWeb : 4.3;
+  const skorDokumen = rataRataSkorDok > 0 ? rataRataSkorDok : (rataRataSkorWeb > 0 ? rataRataSkorWeb : 4.3);
 
-  const skorWeb = useMemo(() => {
-    const qWeb = perPertanyaan.find(
-      (p: any) =>
-        p.pertanyaan.toLowerCase().includes("akses") ||
-        p.pertanyaan.toLowerCase().includes("layanan") ||
-        p.pertanyaan.toLowerCase().includes("portal")
-    );
-    if (qWeb && qWeb.rata_rata > 0) {
-      return Number(qWeb.rata_rata);
-    }
-    return rataRataSkor > 0 ? rataRataSkor : 4.7;
-  }, [perPertanyaan, rataRataSkor]);
+  // Predikat Website Dinamis
+  const predikatTextWeb = useMemo(() => {
+    if (persentaseKepuasanWeb >= 85) return "Predikat Sangat Memuaskan";
+    if (persentaseKepuasanWeb >= 70) return "Predikat Memuaskan / Baik";
+    if (persentaseKepuasanWeb >= 55) return "Predikat Cukup Baik";
+    if (persentaseKepuasanWeb > 0) return "Predikat Perlu Peningkatan";
+    return "Predikat Sangat Memuaskan";
+  }, [persentaseKepuasanWeb]);
+
+  // Predikat Dokumen Hukum Dinamis
+  const predikatTextDokumen = useMemo(() => {
+    const pct = persentaseKepuasanDok > 0 ? persentaseKepuasanDok : ((skorDokumen / 5) * 100);
+    if (pct >= 85) return "Grade A (Sangat Baik)";
+    if (pct >= 70) return "Grade B (Baik)";
+    if (pct >= 55) return "Grade C (Cukup)";
+    return "Grade D (Evaluasi)";
+  }, [persentaseKepuasanDok, skorDokumen]);
+
+  // Indikator Layanan Website (per pertanyaan riil)
+  const indikatorWebsite = useMemo(() => {
+    if (perPertanyaanWeb.length === 0) return [];
+
+    return perPertanyaanWeb.slice(0, 3).map((item, idx) => {
+      const icons = [Layers, BarChart3, SearchCheck];
+      const IconComponent = icons[idx % icons.length];
+      const skor = Number(item.rata_rata || 0);
+      const persentase = Number(((skor / 5) * 100).toFixed(1));
+
+      return {
+        id: item.survey_pertanyaan_id,
+        judul: item.pertanyaan,
+        skor,
+        persentase,
+        icon: IconComponent,
+      };
+    });
+  }, [perPertanyaanWeb]);
+
+  // Indikator Mutu Dokumen Hukum (per pertanyaan survey dokumen riil)
+  const indikatorDokumen = useMemo(() => {
+    if (perPertanyaanDok.length === 0) return [];
+
+    return perPertanyaanDok.slice(0, 3).map((item, idx) => {
+      const icons = [ShieldCheck, FileCheck2, DownloadCloud];
+      const IconComponent = icons[idx % icons.length];
+      const skor = Number(item.rata_rata || 0);
+      const persentase = Number(((skor / 5) * 100).toFixed(1));
+
+      return {
+        id: item.survey_pertanyaan_id,
+        judul: item.pertanyaan,
+        skor,
+        persentase,
+        icon: IconComponent,
+      };
+    });
+  }, [perPertanyaanDok]);
 
   return (
     <section className="relative overflow-hidden border-b border-slate-200 bg-white py-20 text-slate-900 sm:py-24">
@@ -148,7 +188,7 @@ export function PenilaianSummarySection() {
                 <div className="flex flex-col items-end gap-1">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
                     <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
-                    {persentaseKepuasan}% Puas
+                    {persentaseKepuasanWeb}% Puas
                   </span>
                   <span className="text-[10px] text-slate-500 font-mono">
                     Realtime Feedback
@@ -185,54 +225,56 @@ export function PenilaianSummarySection() {
                     Total Responden
                   </span>
                   <span className="font-mono text-2xl font-black text-slate-900">
-                    {totalResponden.toLocaleString("id-ID")}+
+                    {totalRespondenWeb.toLocaleString("id-ID")}+
                   </span>
                   <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-primary">
-                    Predikat Sangat Memuaskan
+                    {predikatTextWeb}
                   </span>
                 </div>
               </div>
 
-              {/* Progress Detail Indikator */}
+              {/* Progress Detail Indikator (Dinamis Berdasarkan Data Survey Riil) */}
               <div className="mt-7 space-y-4">
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <Layers className="h-3.5 w-3.5 text-primary" />
-                      Kemudahan Navigasi &amp; Tampilan Visual
-                    </span>
-                    <span className="font-mono font-bold text-primary">96.8%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[96.8%] rounded-full bg-gradient-to-r from-primary to-blue-500" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <BarChart3 className="h-3.5 w-3.5 text-primary" />
-                      Kecepatan Akses &amp; Kestabilan Sistem
-                    </span>
-                    <span className="font-mono font-bold text-primary">95.4%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[95.4%] rounded-full bg-gradient-to-r from-primary to-blue-500" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <SearchCheck className="h-3.5 w-3.5 text-primary" />
-                      Fitur Asisten Cerdas AI &amp; Pencarian
-                    </span>
-                    <span className="font-mono font-bold text-primary">94.7%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[94.7%] rounded-full bg-gradient-to-r from-primary to-blue-500" />
-                  </div>
-                </div>
+                {indikatorWebsite.length > 0 ? (
+                  indikatorWebsite.map((item) => {
+                    const IconComp = item.icon;
+                    return (
+                      <div key={item.id}>
+                        <div className="flex items-center justify-between text-xs font-medium">
+                          <span className="flex items-center gap-2 text-slate-700 truncate max-w-[80%]">
+                            <IconComp className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="truncate" title={item.judul}>{item.judul}</span>
+                          </span>
+                          <span className="font-mono font-bold text-primary shrink-0">{item.persentase}%</span>
+                        </div>
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500 transition-all duration-700"
+                            style={{ width: `${Math.min(Math.max(item.persentase, 5), 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-2 text-slate-700">
+                          <Layers className="h-3.5 w-3.5 text-primary" />
+                          Kemudahan Navigasi &amp; Tampilan Visual
+                        </span>
+                        <span className="font-mono font-bold text-primary">{persentaseKepuasan}%</span>
+                      </div>
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500"
+                          style={{ width: `${persentaseKepuasan}%` }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

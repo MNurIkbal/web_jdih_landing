@@ -81,7 +81,14 @@ async function applyWatermark(inputPdf, options = {}) {
         const marginX = 25; // 25pt dari kiri
         const marginY = 18; // 18pt dari bawah
 
-        page.drawText(footerText, {
+        // Sanitasi karakter Unicode agar aman di-encode oleh standard font Helvetica WinAnsi
+        const safeFooterText = String(footerText || "")
+            .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, "-")
+            .replace(/[\u2018\u2019]/g, "'")
+            .replace(/[\u201C\u201D]/g, '"')
+            .replace(/[^\x20-\x7E]/g, " ");
+
+        page.drawText(safeFooterText, {
             x: marginX,
             y: marginY,
             size: footerFontSize,

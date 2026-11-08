@@ -40,22 +40,22 @@ export const useSurveyPertanyaanDetail = (id: number) => {
   });
 };
 
-export const useSurveyStatistik = () => {
+export const useSurveyStatistik = (tipe: string = "layanan") => {
   return useQuery({
-    queryKey: ["SurveyStatistik"],
-    queryFn: () => fetchSurveyStatistik(),
+    queryKey: ["SurveyStatistik", tipe],
+    queryFn: () => fetchSurveyStatistik(tipe),
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 };
 
-export const usePublicSurveyStatistik = () => {
+export const usePublicSurveyStatistik = (tipe: string = "layanan") => {
   return useQuery({
-    queryKey: ["PublicSurveyStatistik"],
-    queryFn: () => fetchPublicSurveyStatistik(),
+    queryKey: ["PublicSurveyStatistik", tipe],
+    queryFn: () => fetchPublicSurveyStatistik(tipe),
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 1000 * 60 * 2, // 2 menit
+    staleTime: 0,
   });
 };
 
@@ -112,10 +112,10 @@ export const useDeleteSurveyPertanyaan = () => {
 };
 
 // Public Hooks
-export const usePublicPertanyaan = () => {
+export const usePublicPertanyaan = (tipe: string = "layanan") => {
   return useQuery({
-    queryKey: ["PublicSurveyPertanyaan"],
-    queryFn: () => fetchPublicPertanyaan(),
+    queryKey: ["PublicSurveyPertanyaan", tipe],
+    queryFn: () => fetchPublicPertanyaan(tipe),
     staleTime: 1000 * 60 * 5, // 5 menit
   });
 };
@@ -125,9 +125,15 @@ export const usePublicSurveyPertanyaan = usePublicPertanyaan;
 export const useSubmitPublicSurvey = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (answers: SurveyJawabanSubmission[]) => submitPublicSurvey(answers),
+    mutationFn: ({
+      answers,
+      dokumen_hukum_id,
+    }: {
+      answers: SurveyJawabanSubmission[];
+      dokumen_hukum_id?: number | null;
+    }) => submitPublicSurvey(answers, dokumen_hukum_id),
     onSuccess: () => {
-      toast.success("Terima kasih atas partisipasi Anda dalam survey layanan JDIH!");
+      toast.success("Terima kasih atas partisipasi Anda dalam survey JDIH!");
       qc.invalidateQueries({ queryKey: ["SurveyStatistik"] });
       qc.invalidateQueries({ queryKey: ["PublicSurveyStatistik"] });
     },

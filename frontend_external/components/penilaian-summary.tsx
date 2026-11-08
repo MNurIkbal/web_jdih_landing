@@ -53,44 +53,50 @@ export function PenilaianSummarySection() {
   const { data: surveyData } = usePublicSurveyStatistik();
   const { data: webSummary } = useWebSumaryHookAll();
 
-  // Parsing data survey
-  const totalResponden = surveyData?.totalResponden || 128;
-  const rataRataSkor = surveyData?.rataRataSkor || 4.75;
-  const persentaseKepuasan = surveyData?.persentaseKepuasan || 95.2;
+  // Parsing data survey riil
+  const totalResponden = surveyData?.totalResponden ?? 0;
+  const rataRataSkor = surveyData?.rataRataSkor ?? 0;
+  const persentaseKepuasan = surveyData?.persentaseKepuasan ?? 0;
 
   // Pertanyaan survey
   const perPertanyaan = surveyData?.perPertanyaan || [];
 
   // Data dokumen hukum
   const docSummary = (webSummary as any)?.data ?? {};
-  const totalDokumen = Number(docSummary.produk_hukum || docSummary.peraturan || 42);
+  const totalDokumen = Number(docSummary.produk_hukum || docSummary.peraturan || 0);
 
-  // Perhitungan rating dokumen hukum
-  const skorDokumen = useMemo(() => {
-    const qDoc = perPertanyaan.find(
-      (p) =>
-        p.pertanyaan.toLowerCase().includes("dokumen") ||
-        p.pertanyaan.toLowerCase().includes("produk hukum") ||
-        p.pertanyaan.toLowerCase().includes("informasi hukum")
-    );
-    if (qDoc && qDoc.rata_rata > 0) {
-      return Number(qDoc.rata_rata);
-    }
-    return 4.8;
+  // Gunakan rata-rata skor riil survey secara langsung agar 100% konsisten dengan data web admin portal
+  const skorWeb = rataRataSkor;
+  const skorDokumen = rataRataSkor;
+
+  // Predikat dinamis berdasarkan persentase kepuasan
+  const predikatText = useMemo(() => {
+    if (persentaseKepuasan >= 85) return "Predikat Sangat Memuaskan";
+    if (persentaseKepuasan >= 70) return "Predikat Memuaskan / Baik";
+    if (persentaseKepuasan >= 55) return "Predikat Cukup Baik";
+    if (persentaseKepuasan > 0) return "Predikat Perlu Peningkatan";
+    return "Belum Ada Respon";
+  }, [persentaseKepuasan]);
+
+  // Menghasilkan daftar indikator dinamis dari perPertanyaan survey riil di database
+  const indikatorWebsite = useMemo(() => {
+    if (perPertanyaan.length === 0) return [];
+
+    return perPertanyaan.slice(0, 3).map((item, idx) => {
+      const icons = [Layers, BarChart3, SearchCheck];
+      const IconComponent = icons[idx % icons.length];
+      const skor = Number(item.rata_rata || 0);
+      const persentase = Number(((skor / 5) * 100).toFixed(1));
+
+      return {
+        id: item.survey_pertanyaan_id,
+        judul: item.pertanyaan,
+        skor,
+        persentase,
+        icon: IconComponent,
+      };
+    });
   }, [perPertanyaan]);
-
-  const skorWeb = useMemo(() => {
-    const qWeb = perPertanyaan.find(
-      (p) =>
-        p.pertanyaan.toLowerCase().includes("akses") ||
-        p.pertanyaan.toLowerCase().includes("layanan") ||
-        p.pertanyaan.toLowerCase().includes("portal")
-    );
-    if (qWeb && qWeb.rata_rata > 0) {
-      return Number(qWeb.rata_rata);
-    }
-    return rataRataSkor > 0 ? rataRataSkor : 4.7;
-  }, [perPertanyaan, rataRataSkor]);
 
   return (
     <section className="relative overflow-hidden border-b border-slate-200 bg-white py-20 text-slate-900 sm:py-24">
@@ -188,51 +194,53 @@ export function PenilaianSummarySection() {
                     {totalResponden.toLocaleString("id-ID")}+
                   </span>
                   <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-primary">
-                    Predikat Sangat Memuaskan
+                    {predikatText}
                   </span>
                 </div>
               </div>
 
-              {/* Progress Detail Indikator */}
+              {/* Progress Detail Indikator (Dinamis Berdasarkan Data Survey Riil) */}
               <div className="mt-7 space-y-4">
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <Layers className="h-3.5 w-3.5 text-primary" />
-                      Kemudahan Navigasi &amp; Tampilan Visual
-                    </span>
-                    <span className="font-mono font-bold text-primary">96.8%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[96.8%] rounded-full bg-gradient-to-r from-primary to-blue-500" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <BarChart3 className="h-3.5 w-3.5 text-primary" />
-                      Kecepatan Akses &amp; Kestabilan Sistem
-                    </span>
-                    <span className="font-mono font-bold text-primary">95.4%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[95.4%] rounded-full bg-gradient-to-r from-primary to-blue-500" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-2 text-slate-700">
-                      <SearchCheck className="h-3.5 w-3.5 text-primary" />
-                      Fitur Asisten Cerdas AI &amp; Pencarian
-                    </span>
-                    <span className="font-mono font-bold text-primary">94.7%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full w-[94.7%] rounded-full bg-gradient-to-r from-primary to-blue-500" />
-                  </div>
-                </div>
+                {indikatorWebsite.length > 0 ? (
+                  indikatorWebsite.map((item) => {
+                    const IconComp = item.icon;
+                    return (
+                      <div key={item.id}>
+                        <div className="flex items-center justify-between text-xs font-medium">
+                          <span className="flex items-center gap-2 text-slate-700 truncate max-w-[80%]">
+                            <IconComp className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="truncate" title={item.judul}>{item.judul}</span>
+                          </span>
+                          <span className="font-mono font-bold text-primary shrink-0">{item.persentase}%</span>
+                        </div>
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500 transition-all duration-700"
+                            style={{ width: `${Math.min(Math.max(item.persentase, 5), 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-2 text-slate-700">
+                          <Layers className="h-3.5 w-3.5 text-primary" />
+                          Kemudahan Navigasi &amp; Tampilan Visual
+                        </span>
+                        <span className="font-mono font-bold text-primary">{persentaseKepuasan}%</span>
+                      </div>
+                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500"
+                          style={{ width: `${persentaseKepuasan}%` }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

@@ -209,13 +209,37 @@ export const useUpdateViews = () => {
 };
 
 export const usePriview = () => {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (idDocHukum: number) => updatePriview(idDocHukum),
+    onSuccess: (_, idDocHukum) => {
+      qc.invalidateQueries({
+        queryKey: ["DokumenHukum_web", idDocHukum],
+      });
+      qc.invalidateQueries({
+        queryKey: ["DokumenHukum_web"],
+      });
+      qc.invalidateQueries({
+        queryKey: ["sumary-all-web"],
+      });
+    },
   });
 };
 
 export const useDownload = () => {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (idDocHukumDownload: number) => updateDownload(idDocHukumDownload),
+    onSuccess: (_, idDocHukumDownload) => {
+      qc.invalidateQueries({
+        queryKey: ["DokumenHukum_web", idDocHukumDownload],
+      });
+      qc.invalidateQueries({
+        queryKey: ["DokumenHukum_web"],
+      });
+      qc.invalidateQueries({
+        queryKey: ["sumary-all-web"],
+      });
+    },
   });
 };

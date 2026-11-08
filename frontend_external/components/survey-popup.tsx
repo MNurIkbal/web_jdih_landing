@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
   ClipboardCheck,
@@ -20,7 +21,11 @@ import {
 } from "@/feature/survey/hooks/Survey.hooks";
 import { SurveyJawabanSubmission } from "@/feature/survey/types/Survey.type";
 
-const STORAGE_KEY = "jdih_survey_layanan_done";
+const LAST_SHOWN_KEY = "jdih_survey_last_shown";
+const PAGE_CHANGE_COUNT_KEY = "jdih_survey_page_change_count";
+const HAS_SEEN_ONCE_KEY = "jdih_survey_has_seen_once";
+const COOLDOWN_DAYS = 3;
+const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 
 type Jawaban = SurveyJawabanSubmission["jawaban"];
 
@@ -42,28 +47,79 @@ export function SurveyPopup() {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Jawaban>>({});
   const [done, setDone] = useState(false);
+  const pathname = usePathname();
+  const lastRecordedPath = useRef<string | null>(null);
 
   const { data: pertanyaan } = usePublicSurveyPertanyaan();
   const submitMutation = useSubmitPublicSurvey();
 
   const list = useMemo(() => (Array.isArray(pertanyaan) ? pertanyaan : []), [pertanyaan]);
 
-  // Tampilkan sekali saja untuk pengunjung yang belum pernah mengakses / mengisi
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (localStorage.getItem(STORAGE_KEY)) return;
+  // Cek apakah halaman saat ini adalah portal admin atau autentikasi/login
+  const isAdminOrAuthPage = () => {
+    if (!pathname) return false;
+    return (
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/auth") ||
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/register")
+    );
+  };
+
+  // Cek apakah user sedang dalam masa jeda (cooldown 3 hari)
+  const isCooldownActive = () => {
+    if (typeof window === "undefined") return true;
+    const lastShown = localStorage.getItem(LAST_SHOWN_KEY);
+    if (!lastShown) return false;
+    const lastTimestamp = new Date(lastShown).getTime();
+    if (isNaN(lastTimestamp)) return false;
+    return Date.now() - lastTimestamp < COOLDOWN_MS;
+  };
+
+  const recordPageChangeAndCheck = () => {
+    if (typeof window === "undefined" || open || done) return;
+    if (isAdminOrAuthPage()) return; // Survey hanya untuk landing page / publik
+    if (isCooldownActive()) return;
     if (list.length === 0) return;
 
-    const timer = setTimeout(() => setOpen(true), 1500);
-    return () => clearTimeout(timer);
-  }, [list.length]);
+    // Periksa apakah ini pengunjung pertama kali atau pengunjung berulang setelah masa 3 hari
+    const hasSeenOnce = localStorage.getItem(HAS_SEEN_ONCE_KEY) === "true";
+    const requiredPageChanges = hasSeenOnce ? 5 : 3;
+
+    let count = parseInt(localStorage.getItem(PAGE_CHANGE_COUNT_KEY) || "0", 10);
+    if (isNaN(count)) count = 0;
+    count += 1;
+    localStorage.setItem(PAGE_CHANGE_COUNT_KEY, count.toString());
+
+    if (count >= requiredPageChanges) {
+      setOpen(true);
+      localStorage.setItem(LAST_SHOWN_KEY, new Date().toISOString());
+      localStorage.setItem(HAS_SEEN_ONCE_KEY, "true");
+      localStorage.setItem(PAGE_CHANGE_COUNT_KEY, "0");
+    }
+  };
+
+  // Deteksi interaksi pindah page (route change)
+  useEffect(() => {
+    if (isAdminOrAuthPage()) {
+      if (open) setOpen(false);
+      return;
+    }
+
+    if (pathname && lastRecordedPath.current !== pathname) {
+      lastRecordedPath.current = pathname;
+      recordPageChangeAndCheck();
+    }
+  }, [pathname, list.length, open, done]);
 
   const markDone = () => {
-    localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+    localStorage.setItem(LAST_SHOWN_KEY, new Date().toISOString());
+    localStorage.setItem(HAS_SEEN_ONCE_KEY, "true");
+    localStorage.setItem(PAGE_CHANGE_COUNT_KEY, "0");
   };
 
   const handleClose = () => {
-    markDone(); // ditutup pun dianggap sudah pernah muncul (hanya sekali)
+    markDone(); // ditutup tetap tercatat dan masuk cooldown 3 hari
     setOpen(false);
   };
 
@@ -81,7 +137,7 @@ export function SurveyPopup() {
       }));
 
     try {
-      await submitMutation.mutateAsync(payload);
+      await submitMutation.mutateAsync({ answers: payload });
       markDone();
       setDone(true);
       setTimeout(() => setOpen(false), 2200);
@@ -90,10 +146,13 @@ export function SurveyPopup() {
     }
   };
 
-  if (!open || !current) return null;
+  if (!open || !current || isAdminOrAuthPage()) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm animate-in fade-in duration-300">
+    <div
+      data-survey-popup
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm animate-in fade-in duration-300"
+    >
       <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.3)] animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
         {/* Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-[#0D3B73] via-[#1358A8] to-[#1d6fd1] px-6 pb-6 pt-5 text-white">

@@ -84,6 +84,13 @@ export const JDIH_MENU_ITEMS: AdminMenuItem[] = [
     roles: ["superadmin", "admin"],
   },
   {
+    label: "Survey Dokumen",
+    href: "/admin/survey-dokumen",
+    icon: FileCheck2,
+    module: "JDIH",
+    roles: ["superadmin", "admin"],
+  },
+  {
     label: "Pengguna",
     href: "/admin/pengguna",
     icon: Users,

@@ -11,9 +11,19 @@ import {
   Scale,
   ShieldCheck,
   TrendingUp,
+  Activity,
+  Layers,
+  FileCheck2,
+  Clock,
+  Sparkles,
+  ArrowRight,
+  ChevronRight,
+  CheckCircle2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useWebSumaryDashboard, useWebSumaryGrafik } from "@/feature/web";
+import { usePengajuanList } from "@/feature/pengajuan-peraturan/hooks/PengajuanPeraturan.hooks";
 
 type SummaryCard = {
   title: string;
@@ -21,6 +31,7 @@ type SummaryCard = {
   change: string;
   description: string;
   href: string;
+  badge?: string;
   icon: React.ComponentType<{ className?: string }>;
 };
 
@@ -44,76 +55,74 @@ type TahunData = {
 };
 
 export default function DashboardPage() {
-
   const {
     data: summaryResponse,
     isLoading: isLoadingSummary,
     isError: isErrorSummary,
+    refetch: refetchSummary,
   } = useWebSumaryDashboard();
 
   const {
     data: grafikResponse,
     isLoading: isLoadingGrafik,
     isError: isErrorGrafik,
+    refetch: refetchGrafik,
   } = useWebSumaryGrafik();
 
+  const {
+    data: pengajuanResponse,
+    isLoading: isLoadingPengajuan,
+  } = usePengajuanList({
+    page: 1,
+    size: 5,
+  });
+
   const summaryData = summaryResponse?.data;
-
   const totalDokumen = summaryData?.dokumen?.total ?? 0;
-
   const totalPeraturan = summaryData?.dokumen?.peraturan ?? 0;
-
   const totalKeputusan = summaryData?.dokumen?.keputusan ?? 0;
-
-  const totalPerundangUndangan =
-    summaryData?.dokumen?.perundang_undangan ?? 0;
-
+  const totalPerundangUndangan = summaryData?.dokumen?.perundang_undangan ?? 0;
+  const totalInstruksi = summaryData?.dokumen?.instruksi ?? 0;
   const totalBerita = summaryData?.berita?.total ?? 0;
+  const pengajuanStats = summaryData?.pengajuan;
+
+  const recentDrafts = (pengajuanResponse as any)?.data || [];
 
   const tahunData: TahunData[] = useMemo(() => {
     const data = grafikResponse?.data?.tahun ?? [];
-
     return [...data].sort((a, b) => a.tahun - b.tahun);
   }, [grafikResponse]);
 
   const summaryCards: SummaryCard[] = [
     {
-      title: "Perundang-Undangan",
-      value: isLoadingSummary
-        ? "..."
-        : totalPerundangUndangan.toLocaleString("id-ID"),
-      change: "",
-      description: "  ",
-      icon: FileText,
-      href: "/admin/dokumen",
-    },
-    {
       title: "Peraturan",
-      value: isLoadingSummary
-        ? "..."
-        : totalPeraturan.toLocaleString("id-ID"),
-      change: "",
-      description: "dokumen aktif",
+      value: isLoadingSummary ? "..." : totalPeraturan.toLocaleString("id-ID"),
+      change: "Regulasi",
+      description: "Peraturan aktif & draf hukum",
       icon: Gavel,
-      href: "/admin/dokumen",
+      href: "/admin/dokumen-hukum",
     },
     {
       title: "Keputusan",
-      value: isLoadingSummary
-        ? "..."
-        : totalKeputusan.toLocaleString("id-ID"),
-      change: "",
-      description: "dokumen aktif",
+      value: isLoadingSummary ? "..." : totalKeputusan.toLocaleString("id-ID"),
+      change: "Ketetapan",
+      description: "Surat keputusan & produk resmi",
       icon: Scale,
-      href: "/admin/dokumen",
+      href: "/admin/dokumen-hukum",
     },
     {
-      title: "Berita",
-      value: isLoadingSummary
-        ? "..."
-        : totalBerita.toLocaleString("id-ID"),
-      change: "",
-      description: "berita dipublikasikan",
+      title: "Perundang-Undangan",
+      value: isLoadingSummary ? "..." : totalPerundangUndangan.toLocaleString("id-ID"),
+      change: "Undang-Undang",
+      description: "Regulasi tingkat UU & Perpres",
+      icon: FileText,
+      href: "/admin/dokumen-hukum",
+    },
+    {
+      title: "Berita & Pengumuman",
+      value: isLoadingSummary ? "..." : totalBerita.toLocaleString("id-ID"),
+      change: "Publikasi",
+      description: "Berita & rilis terpublikasi",
       icon: Newspaper,
       href: "/admin/berita",
     },
@@ -121,7 +130,7 @@ export default function DashboardPage() {
 
   const chartSeries: ChartSeries[] = [
     {
-      name: "Dokumen",
+      name: "Total Dokumen Terbit",
       color: "#2563eb",
       values: tahunData.map((item) => item.total),
     },
@@ -152,254 +161,328 @@ export default function DashboardPage() {
   const totalGrafik = grafikResponse?.data?.total ?? totalDokumen;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f5f7fb]">
+    <main className="relative min-h-screen overflow-hidden bg-[#f8fafc]">
+      {/* Background Ornaments */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-32 -top-32 h-[420px] w-[420px] animate-pulse rounded-full bg-blue-200/20 blur-3xl" />
-
-        <div
-          className="absolute right-[-120px] top-[180px] h-[420px] w-[420px] rounded-full bg-indigo-200/20 blur-3xl"
-          style={{
-            animation: "float 8s ease-in-out infinite",
-          }}
-        />
-
-        <div
-          className="absolute bottom-[-180px] left-[35%] h-[450px] w-[450px] rounded-full bg-slate-300/20 blur-3xl"
-          style={{
-            animation: "float 10s ease-in-out infinite reverse",
-          }}
-        />
-
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.05),transparent_35%)]" />
+        <div className="absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full bg-blue-200/20 blur-3xl" />
+        <div className="absolute right-[-120px] top-[180px] h-[420px] w-[420px] rounded-full bg-indigo-200/20 blur-3xl" />
+        <div className="absolute bottom-[-180px] left-[35%] h-[450px] w-[450px] rounded-full bg-slate-300/20 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.04),transparent_35%)]" />
       </div>
 
-  
-
-      <div className="relative z-10 mx-auto max-w-[1600px] px-5 py-6 sm:px-7 lg:px-8">
-        <section className="animate-[fadeInUp_0.7s_ease-out] relative mb-7 overflow-hidden rounded-[28px] bg-slate-950 shadow-2xl">
-          {/* Decorative circles */}
-
+      <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 space-y-7">
+        {/* HERO BANNER MODERN */}
+        <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 text-white shadow-2xl p-6 sm:p-9 lg:p-12 border border-slate-800">
           <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full border-[45px] border-white/[0.03]" />
-
           <div className="pointer-events-none absolute right-24 top-16 h-56 w-56 rounded-full border border-white/[0.06]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,rgba(59,130,246,0.15),transparent_40%)]" />
 
-          <div className="pointer-events-none absolute -bottom-40 left-1/2 h-80 w-80 rounded-full border-[35px] border-white/[0.03]" />
-
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,rgba(59,130,246,0.12),transparent_35%)]" />
-
-          <div className="relative grid min-h-[300px] lg:grid-cols-2">
-            {/* HERO CONTENT */}
-
-            <div className="relative z-10 flex flex-col justify-center p-7 sm:p-9 lg:p-12">
-              <div className="mb-5 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-white shadow-lg backdrop-blur-sm transition-transform duration-500 hover:scale-110">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-bold text-white">
-                    JDIH BIN
-                  </p>
-
-                  <p className="text-xs text-slate-400">
-                    Badan Intelijen Negara
-                  </p>
-                </div>
+          <div className="relative z-10 grid gap-8 lg:grid-cols-12 items-center">
+            <div className="lg:col-span-8 space-y-4">
+              <div className="inline-flex items-center gap-2.5 rounded-full bg-white/10 px-3.5 py-1 text-xs font-semibold backdrop-blur-md border border-white/10">
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                <span>Portal Resmi Legislasi JDIH BIN</span>
               </div>
 
-              <h2 className="max-w-xl text-2xl font-bold tracking-tight text-white sm:text-3xl lg:text-4xl">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white leading-tight">
                 Pusat Dokumentasi dan Informasi Hukum
-              </h2>
+              </h1>
 
-              <p className="mt-4 max-w-xl text-sm leading-7 text-slate-400 sm:text-base">
-                Kelola produk hukum, dokumentasi, publikasi berita, dan
-                informasi hukum secara terstruktur, aman, dan mudah dipantau.
+              <p className="max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">
+                Monitoring terpadu produk hukum, proses telaah harmonisasi norma peraturan, persetujuan multi-pihak, hingga penetapan repositori dokumen hukum internal dan eksternal secara akurat dan transparan.
               </p>
+
+              <div className="pt-2 flex flex-wrap items-center gap-3">
+                <Link
+                  href="/admin/pengajuan-peraturan"
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition cursor-pointer"
+                >
+                  <span>Kelola Pengajuan Peraturan</span>
+                  <ArrowRight size={14} />
+                </Link>
+                <Link
+                  href="/admin/pengajuan-peraturan?tab=monitoring"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold text-white border border-white/15 hover:bg-white/20 backdrop-blur-md transition cursor-pointer"
+                >
+                  <Activity size={14} className="text-blue-400" />
+                  <span>Monitoring Progres Draf</span>
+                </Link>
+              </div>
             </div>
 
-            {/* HERO VISUAL */}
-
-            <div className="relative hidden min-h-[300px] lg:block">
-              <div
-                className="absolute right-14 top-1/2 -translate-y-1/2"
-                style={{
-                  animation: "float 6s ease-in-out infinite",
-                }}
-              >
-                <div className="flex h-64 w-64 items-center justify-center rounded-full border border-white/10 bg-white/[0.02]">
-                  <div className="flex h-48 w-48 items-center justify-center rounded-full border border-white/10 bg-white/[0.03]">
-                    <div className="flex h-32 w-32 items-center justify-center rounded-3xl border border-white/10 bg-white/10 text-white shadow-2xl backdrop-blur-xl">
-                      <BookOpen className="h-16 w-16" />
-                    </div>
-                  </div>
+            {/* Quick Stats Banner Kanan */}
+            <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3">
+              <div className="flex-1 rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Produk Hukum</span>
+                  <BookOpen className="h-4 w-4 text-blue-400" />
+                </div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-white">{totalDokumen.toLocaleString("id-ID")}</span>
+                  <span className="text-xs text-slate-400">dokumen terbit</span>
                 </div>
               </div>
 
-              {/* STATUS CARD */}
-
-              <div className="absolute bottom-8 left-10 w-52 rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-2xl backdrop-blur-xl transition-transform duration-500 hover:-translate-y-2">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                  Sistem Aktif
-                </p>
-
-                <div className="mt-1 flex items-center justify-between">
-                  <p className="text-2xl font-bold text-white">
-                    100%
-                  </p>
-
-                  <TrendingUp className="h-5 w-5 text-emerald-400" />
+              <div className="flex-1 rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Draf Dalam Proses</span>
+                  <Activity className="h-4 w-4 text-amber-400 animate-pulse" />
                 </div>
-
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full w-[100%] rounded-full bg-emerald-400"
-                    style={{
-                      animation: "progress 1.5s ease-out",
-                    }}
-                  />
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-amber-400">
+                    {(pengajuanStats?.total ?? 0).toLocaleString("id-ID")}
+                  </span>
+                  <span className="text-xs text-slate-400">rancangan regulasi</span>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mb-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* SUMMARY CARDS KATEGORI DOKUMEN HUKUM */}
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {summaryCards.map((card, index) => {
             const Icon = card.icon;
 
             return (
-              <div
-                key={card.title || `summary-card-${index}`}
-                className="group animate-[fadeInUp_0.6s_ease-out] relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-2 hover:border-slate-300 hover:shadow-2xl"
-                style={{
-                  animationDelay: `${index * 100}ms`,
-                  animationFillMode: "both",
-                }}
+              <Link
+                key={card.title}
+                href={card.href}
+                className="group relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs hover:border-blue-300 hover:shadow-xl transition-all duration-300"
               >
-                <div className="absolute -right-10 -top-10 h-24 w-24 rounded-full bg-slate-50 transition-all duration-500 group-hover:scale-[2.5] group-hover:bg-slate-100" />
-
-                <div className="relative">
-                  <div className="flex items-start justify-between">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-950 group-hover:text-white">
-                      <Icon className="h-5 w-5" />
-                    </div>
-
-                    <ArrowUpRight className="h-4 w-4 text-slate-300 transition-all duration-300 group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-slate-950" />
+                <div className="flex items-start justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-700 border border-slate-100 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all duration-300 shadow-xs">
+                    <Icon className="h-6 w-6" />
                   </div>
 
-                  <p className="mt-5 text-sm font-medium text-slate-500">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition">
+                    <ArrowUpRight size={15} />
+                  </span>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                     {card.title}
                   </p>
-
-                  <div className="mt-1 flex items-end gap-3">
-                    <p className="text-3xl font-bold text-slate-950">
-                      {card.value}
-                    </p>
-                  </div>
+                  <p className="mt-1 text-3xl font-black text-slate-900 tracking-tight">
+                    {card.value}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 font-medium">
+                    {card.description}
+                  </p>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </section>
 
-        <section className="animate-[fadeInUp_0.9s_ease-out] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm backdrop-blur-sm">
-          {/* CHART HEADER */}
-
-          <div className="flex flex-col gap-5 border-b border-slate-100 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 transition-transform duration-300 hover:scale-110">
-                <BarChart3 className="h-5 w-5 text-slate-700" />
+        {/* PIPELINE ALUR PENGAJUAN PERATURAN (5 TAHAPAN) */}
+        <section className="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                  <Layers size={17} />
+                </div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Pipeline Alur Pembentukan Regulasi (5 Tahap)
+                </h3>
               </div>
-
-              <div>
-                <h2 className="font-semibold text-slate-950">
-                  Statistik Dokumen Hukum
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Perkembangan jumlah dokumen berdasarkan tahun
-                </p>
-              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Rangkuman status distribusi seluruh draf peraturan hukum pada tiap tahapan aktif
+              </p>
             </div>
 
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {chartSeries.map((series) => (
-                <Legend
-                  key={series.name}
-                  label={series.name}
-                  color={series.color}
-                />
-              ))}
-            </div>
+            <Link
+              href="/admin/pengajuan-peraturan?tab=monitoring"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
+            >
+              <span>Buka Seluruh Monitoring</span>
+              <ChevronRight size={14} />
+            </Link>
           </div>
 
-          {/* CHART */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+              <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Tahap 1</span>
+              <p className="text-xs font-bold text-slate-700 mt-0.5">Pengajuan Draf</p>
+              <p className="text-2xl font-black text-blue-700 mt-2">
+                {isLoadingSummary ? "..." : (pengajuanStats?.pengajuan ?? 0)}
+              </p>
+              <span className="text-[10px] text-slate-400">Verifikasi Dokumen</span>
+            </div>
 
-          <div className="px-3 py-4 sm:px-5 sm:py-5">
-            {isLoadingGrafik ? (
-              <div className="flex h-[350px] items-center justify-center text-sm text-slate-400">
-                Memuat grafik...
-              </div>
-            ) : isErrorGrafik ? (
-              <div className="flex h-[350px] items-center justify-center text-sm text-red-400">
-                Gagal mengambil data grafik.
-              </div>
-            ) : (
-              <LineChart
-                chartSeries={chartSeries}
-                months={months}
-                gridValues={gridValues}
-              />
-            )}
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+              <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Tahap 2</span>
+              <p className="text-xs font-bold text-slate-700 mt-0.5">Pembahasan</p>
+              <p className="text-2xl font-black text-indigo-700 mt-2">
+                {isLoadingSummary ? "..." : (pengajuanStats?.pembahasan ?? 0)}
+              </p>
+              <span className="text-[10px] text-slate-400">Rapat & Notulensi</span>
+            </div>
+
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
+              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Tahap 3</span>
+              <p className="text-xs font-bold text-slate-700 mt-0.5">Harmonisasi</p>
+              <p className="text-2xl font-black text-amber-700 mt-2">
+                {isLoadingSummary ? "..." : (pengajuanStats?.harmonisasi ?? 0)}
+              </p>
+              <span className="text-[10px] text-slate-400">Penyelarasan Norma</span>
+            </div>
+
+            <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-4">
+              <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider">Tahap 4</span>
+              <p className="text-xs font-bold text-slate-700 mt-0.5">Persetujuan</p>
+              <p className="text-2xl font-black text-purple-700 mt-2">
+                {isLoadingSummary ? "..." : (pengajuanStats?.persetujuan ?? 0)}
+              </p>
+              <span className="text-[10px] text-slate-400">Penetapan Pejabat</span>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Tahap 5</span>
+              <p className="text-xs font-bold text-slate-700 mt-0.5">Penetapan</p>
+              <p className="text-2xl font-black text-emerald-700 mt-2">
+                {isLoadingSummary ? "..." : ((pengajuanStats?.penetapan ?? 0) + (pengajuanStats?.selesai ?? 0))}
+              </p>
+              <span className="text-[10px] text-slate-400">Pengundangan Resmi</span>
+            </div>
           </div>
         </section>
 
-        {/* Optional supaya variable summary error tetap digunakan */}
-        {isErrorSummary && (
-          <div className="mt-3 text-xs text-red-400">
-            Gagal mengambil summary dashboard.
+        {/* GRID DUA KOLOM: GRAFIK TAHUNAN & DRAF TERBARU */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-7">
+          {/* Kolom Kiri: Line Chart Statistik Dokumen Per Tahun */}
+          <div className="lg:col-span-7 rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <BarChart3 size={18} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                    Statistik Dokumen Hukum Berdasarkan Tahun
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Histori publikasi produk hukum resmi ({totalGrafik} total dokumen)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {chartSeries.map((series) => (
+                  <Legend key={series.name} label={series.name} color={series.color} />
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2">
+              {isLoadingGrafik ? (
+                <div className="flex h-[320px] items-center justify-center text-xs text-slate-400">
+                  Memuat data statistik grafik...
+                </div>
+              ) : isErrorGrafik || tahunData.length === 0 ? (
+                <div className="flex h-[320px] flex-col items-center justify-center text-center p-6 text-slate-400">
+                  <BarChart3 size={32} className="text-slate-300 mb-2" />
+                  <p className="text-xs font-semibold text-slate-600">Belum ada histori data tahunan</p>
+                  <button
+                    type="button"
+                    onClick={() => refetchGrafik()}
+                    className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    Segarkan Grafik
+                  </button>
+                </div>
+              ) : (
+                <LineChart
+                  chartSeries={chartSeries}
+                  months={months}
+                  gridValues={gridValues}
+                />
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Kolom Kanan: Draf Regulasi Terbaru yang Sedang Diproses */}
+          <div className="lg:col-span-5 rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xs space-y-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                      Aktivitas Draf Regulasi Terbaru
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Rancangan peraturan terakhir diajukan
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  href="/admin/pengajuan-peraturan"
+                  className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                >
+                  Lihat Semua
+                </Link>
+              </div>
+
+              <div className="mt-4 divide-y divide-slate-100">
+                {isLoadingPengajuan ? (
+                  <div className="py-12 text-center text-xs text-slate-400">
+                    Memuat draf terbaru...
+                  </div>
+                ) : recentDrafts.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-slate-400">
+                    Belum ada draf permohonan regulasi
+                  </div>
+                ) : (
+                  recentDrafts.map((draft: any) => (
+                    <div key={draft.id} className="py-3 flex items-start justify-between gap-3">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                            {draft.kategori || "Peraturan"}
+                          </span>
+                          <span className="text-[11px] text-slate-400">• Tahap:</span>
+                          <span className="text-[11px] font-extrabold text-blue-700">
+                            {draft.tahapan}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-bold text-slate-900 truncate max-w-xs" title={draft.judul}>
+                          {draft.judul}
+                        </h4>
+                      </div>
+
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                        draft.status === "Ditetapkan"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : draft.status === "Perlu Perbaikan Harmonisasi" || draft.status === "Ditolak"
+                          ? "bg-rose-50 text-rose-700"
+                          : "bg-blue-50 text-blue-700"
+                      }`}>
+                        {draft.status}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <Link
+                href="/admin/pengajuan-peraturan"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
+              >
+                <span>Buka Manajemen Pengajuan Peraturan</span>
+                <ArrowRight size={13} />
+              </Link>
+            </div>
+          </div>
+        </section>
       </div>
-
-      {/* =====================================================
-          CUSTOM ANIMATION
-      ===================================================== */}
-
-      <style jsx global>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(18px);
-          }
-
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0);
-          }
-
-          50% {
-            transform: translateY(-12px);
-          }
-        }
-
-        @keyframes progress {
-          from {
-            width: 0;
-          }
-
-          to {
-            width: 99%;
-          }
-        }
-      `}</style>
     </main>
   );
 }

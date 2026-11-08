@@ -447,15 +447,15 @@ export default function PenggunaForm({
         options={[
           {
             value: "pengguna",
-            label: "Pengguna (Pembuat Pengajuan & Dokumen Hukum)",
+            label: "Pengguna",
           },
           {
             value: "admin",
-            label: "Admin (Verifikator Semua Menu kecuali Pengguna & Pengaturan)",
+            label: "Admin",
           },
           {
             value: "superadmin",
-            label: "Superadmin (Akses Penuh Semua Menu)",
+            label: "Superadmin",
           },
         ]}
         placeholder="Pilih role akses..."

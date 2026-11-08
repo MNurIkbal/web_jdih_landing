@@ -293,6 +293,15 @@ export function ProdukHukumDetail({ id }: { id: number }) {
 
                     updateDownload((produk as any).id);
 
+                    // Memicu event pop-up survey dokumen hukum
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(
+                        new CustomEvent("jdih_download_dokumen", {
+                          detail: { id: (produk as any).id, judul: produk.judul || produk.tentang },
+                        })
+                      );
+                    }
+
                     handleDownloadPeraturan(produk, userName);
                   }}
                   className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${produk.file_dokumen && !isDownloadPending

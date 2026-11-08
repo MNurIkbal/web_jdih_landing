@@ -76,7 +76,6 @@ export interface PengajuanPeraturan {
   status_penunjukan_pejabat?: "Draft" | "Disimpan" | string;
   // Tahap 5 Penetapan
   nomor_penetapan?: string;
-  tanggal_penetapan?: string;
   file_dokumen_final?: string;
   id_dokumen_hukum_terbit?: number;
   // Relasi

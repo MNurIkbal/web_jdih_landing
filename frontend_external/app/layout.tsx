@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
+import { SurveyPopup } from "@/components/survey-popup";
+import { SurveyDokumenPopup } from "@/components/survey-dokumen-popup";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -40,6 +42,8 @@ export default function RootLayout({
       <body className="antialiased flex min-h-screen flex-col">
         <QueryProvider>
           <div className="flex-1">{children}</div>
+          <SurveyPopup />
+          <SurveyDokumenPopup />
         </QueryProvider>
       </body>
     </html>

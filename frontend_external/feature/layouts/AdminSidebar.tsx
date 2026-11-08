@@ -55,6 +55,11 @@ const MENU = [
     icon: ClipboardList,
   },
   {
+    label: "Survey Dokumen",
+    href: "/admin/survey-dokumen",
+    icon: FileText,
+  },
+  {
     label: "Pengguna",
     href: "/admin/pengguna",
     icon: Users,

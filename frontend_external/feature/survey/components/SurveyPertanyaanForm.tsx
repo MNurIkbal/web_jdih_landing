@@ -15,6 +15,7 @@ import FormSwitch from "@/components/ui/FormSwitch";
 interface SurveyPertanyaanFormProps {
   mode: "create" | "edit";
   data?: SurveyPertanyaan | null;
+  tipe?: "layanan" | "dokumen";
   onSuccess?: () => void;
 }
 
@@ -27,6 +28,7 @@ interface FormValues {
 export default function SurveyPertanyaanForm({
   mode,
   data,
+  tipe = "layanan",
   onSuccess,
 }: SurveyPertanyaanFormProps) {
   const isEdit = mode === "edit";
@@ -77,6 +79,7 @@ export default function SurveyPertanyaanForm({
             pertanyaan: values.pertanyaan.trim(),
             urutan: Number(values.urutan) || 0,
             status: values.status,
+            tipe_survey: data.tipe_survey || tipe,
           },
         });
       } else {
@@ -84,6 +87,7 @@ export default function SurveyPertanyaanForm({
           pertanyaan: values.pertanyaan.trim(),
           urutan: Number(values.urutan) || 0,
           status: values.status,
+          tipe_survey: tipe,
         });
       }
 

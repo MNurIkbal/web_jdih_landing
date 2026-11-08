@@ -19,6 +19,7 @@ const JAWABAN_CONFIG = [
   {
     label: "Sangat Baik",
     color: "bg-emerald-500",
+    fillColor: "#10b981",
     textColor: "text-emerald-700",
     bgLight: "bg-emerald-50 border-emerald-200",
     icon: Smile,
@@ -26,6 +27,7 @@ const JAWABAN_CONFIG = [
   {
     label: "Baik",
     color: "bg-blue-500",
+    fillColor: "#3b82f6",
     textColor: "text-blue-700",
     bgLight: "bg-blue-50 border-blue-200",
     icon: ThumbsUp,
@@ -33,6 +35,7 @@ const JAWABAN_CONFIG = [
   {
     label: "Cukup",
     color: "bg-amber-500",
+    fillColor: "#f59e0b",
     textColor: "text-amber-700",
     bgLight: "bg-amber-50 border-amber-200",
     icon: Meh,
@@ -40,6 +43,7 @@ const JAWABAN_CONFIG = [
   {
     label: "Kurang",
     color: "bg-orange-500",
+    fillColor: "#f97316",
     textColor: "text-orange-700",
     bgLight: "bg-orange-50 border-orange-200",
     icon: ThumbsDown,
@@ -47,14 +51,15 @@ const JAWABAN_CONFIG = [
   {
     label: "Kurang Sekali",
     color: "bg-rose-500",
+    fillColor: "#f43f5e",
     textColor: "text-rose-700",
     bgLight: "bg-rose-50 border-rose-200",
     icon: Frown,
   },
 ];
 
-export default function SurveyStatistikGrafik() {
-  const { data: stats, isLoading, refetch } = useSurveyStatistik();
+export default function SurveyStatistikGrafik({ tipe = "layanan" }: { tipe?: "layanan" | "dokumen" }) {
+  const { data: stats, isLoading, refetch } = useSurveyStatistik(tipe);
 
   const totalResponden = stats?.totalResponden || 0;
   const persentaseKepuasan = stats?.persentaseKepuasan || 0;
@@ -181,37 +186,158 @@ export default function SurveyStatistikGrafik() {
             </p>
           </div>
         ) : (
-          <div className="mt-6 space-y-4">
-            {JAWABAN_CONFIG.map((cfg) => {
-              const count = (distribusi as any)[cfg.label] || 0;
-              const percent = totalResponden > 0 ? ((count / totalResponden) * 100).toFixed(1) : "0.0";
-              const IconComp = cfg.icon;
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Donut / Lingkaran Chart SVG */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center p-4">
+              <div className="relative flex items-center justify-center">
+                {(() => {
+                  const size = 200;
+                  const strokeWidth = 26;
+                  const radius = (size - strokeWidth) / 2;
+                  const circumference = 2 * Math.PI * radius;
+                  let accumulatedOffset = 0;
 
-              return (
-                <div key={cfg.label} className="group">
-                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <IconComp size={15} className={cfg.textColor} />
-                      <span>{cfg.label}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-normal">{count} suara</span>
-                      <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${cfg.textColor} ${cfg.bgLight}`}>
-                        {percent}%
-                      </span>
-                    </div>
-                  </div>
+                  return (
+                    <svg
+                      width={size}
+                      height={size}
+                      viewBox={`0 0 ${size} ${size}`}
+                      className="-rotate-90 transform"
+                    >
+                      <circle
+                        cx={size / 2}
+                        cy={size / 2}
+                        r={radius}
+                        fill="transparent"
+                        stroke="#f1f5f9"
+                        strokeWidth={strokeWidth}
+                      />
+                      {JAWABAN_CONFIG.map((cfg) => {
+                        const count = (distribusi as any)[cfg.label] || 0;
+                        if (count === 0) return null;
+                        const fraction = count / totalResponden;
+                        const strokeDasharray = `${fraction * circumference} ${circumference}`;
+                        const strokeDashoffset = -accumulatedOffset;
+                        accumulatedOffset += fraction * circumference;
 
-                  {/* Progress Bar */}
-                  <div className="h-3.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ease-out ${cfg.color}`}
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
+                        return (
+                          <circle
+                            key={cfg.label}
+                            cx={size / 2}
+                            cy={size / 2}
+                            r={radius}
+                            fill="transparent"
+                            stroke={cfg.fillColor}
+                            strokeWidth={strokeWidth}
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                            className="transition-all duration-700 ease-out hover:opacity-85"
+                          />
+                        );
+                      })}
+                    </svg>
+                  );
+                })()}
+
+                {/* Indikator Pusat Lingkaran */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                  <span className="text-3xl font-black tracking-tight text-slate-900">
+                    {totalResponden}
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Total Suara
+                  </span>
                 </div>
-              );
-            })}
+              </div>
+
+              {/* Ringkasan Skor Kepuasan */}
+              <div className="mt-4 flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500">
+                  Rata-rata Skor:
+                </span>
+                <span className="text-sm font-bold text-slate-800">
+                  {rataRataSkor} / 5.0
+                </span>
+                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${predikat.color}`}>
+                  {predikat.text}
+                </span>
+              </div>
+
+              {/* Legend untuk Grafik Lingkaran */}
+              <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-center gap-2 max-w-xs">
+                {JAWABAN_CONFIG.map((cfg) => {
+                  const count = (distribusi as any)[cfg.label] || 0;
+                  return (
+                    <div
+                      key={`legend-circle-${cfg.label}`}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[11px]"
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: cfg.fillColor }}
+                      />
+                      <span className="font-semibold text-slate-700">{cfg.label}:</span>
+                      <span className="font-bold text-slate-900">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* List Progress Bar Horizontal & Persentase dengan Legend */}
+            <div className="lg:col-span-7 space-y-4">
+              {/* Legend Header Bar */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <span>Kategori Indikator</span>
+                <span>Distribusi & Persentase</span>
+              </div>
+
+              {JAWABAN_CONFIG.map((cfg) => {
+                const count = (distribusi as any)[cfg.label] || 0;
+                const percent = totalResponden > 0 ? ((count / totalResponden) * 100).toFixed(1) : "0.0";
+                const IconComp = cfg.icon;
+
+                return (
+                  <div key={cfg.label} className="group">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0 shadow-xs"
+                          style={{ backgroundColor: cfg.fillColor }}
+                        />
+                        <IconComp size={15} className={cfg.textColor} />
+                        <span>{cfg.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 font-normal">{count} suara</span>
+                        <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${cfg.textColor} ${cfg.bgLight}`}>
+                          {percent}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar Batang dengan Efek Hover */}
+                    <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100 group-hover:bg-slate-200/80 transition-colors">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ease-out ${cfg.color}`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Legend Ringkas Bawah Bar Chart */}
+              <div className="pt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                <span className="font-bold text-slate-600">Legend Bar:</span>
+                {JAWABAN_CONFIG.map((cfg) => (
+                  <div key={`bar-legend-${cfg.label}`} className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cfg.fillColor }} />
+                    <span>{cfg.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

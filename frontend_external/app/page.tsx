@@ -5,7 +5,6 @@ import { BeritaSection } from "@/components/berita-section";
 import { PeraturanList } from "@/components/peraturan-list";
 import { SiteFooter } from "@/components/site-footer";
 import { Navbar } from "@/components/navbar";
-import { SurveyPopup } from "@/components/survey-popup";
 
 export default function BerandaPage() {
   return (
@@ -17,7 +16,6 @@ export default function BerandaPage() {
       <BeritaSection />
       <PeraturanList />
       <SiteFooter />
-      <SurveyPopup />
     </>
   );
 }

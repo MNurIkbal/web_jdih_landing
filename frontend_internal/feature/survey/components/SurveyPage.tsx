@@ -1,32 +1,38 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { HelpCircle, BarChart3, ListFilter } from "lucide-react";
-import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
-import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
+import { useMemo, useState, Suspense } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import {
+  useSurveyPertanyaanList,
+  useDeleteSurveyPertanyaan,
+} from "../hooks/Survey.hooks";
+import DataTable, { DataTableColumn } from "@/components/ui/DataTable";
 import Drawer from "@/components/ui/Drawer";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 import SurveyPertanyaanForm from "./SurveyPertanyaanForm";
 import SurveyStatistikGrafik from "./SurveyStatistikGrafik";
-import {
-  useDeleteSurveyPertanyaan,
-  useSurveyPertanyaanList,
-} from "../hooks/Survey.hooks";
+import { BarChart3, ListFilter, ClipboardList, FileCheck2 } from "lucide-react";
 import { SurveyPertanyaan } from "../types/Survey.type";
 import { toast } from "sonner";
 
-export default function SurveyPage() {
+interface SurveyPageProps {
+  tipe?: "layanan" | "dokumen";
+}
+
+export default function SurveyPage({ tipe = "layanan" }: SurveyPageProps) {
   return (
     <Suspense fallback={null}>
-      <SurveyContent />
+      <SurveyContent tipe={tipe} />
     </Suspense>
   );
 }
 
-function SurveyContent() {
+function SurveyContent({ tipe = "layanan" }: { tipe: "layanan" | "dokumen" }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const isDokumen = tipe === "dokumen";
 
   const [activeTab, setActiveTab] = useState<"grafik" | "pertanyaan">("grafik");
 
@@ -49,8 +55,9 @@ function SurveyContent() {
       page,
       size,
       search,
+      tipe,
     }),
-    [page, size, search]
+    [page, size, search, tipe]
   );
 
   const { data: res, isLoading, isFetching, refetch } = useSurveyPertanyaanList(apiParams);
@@ -73,20 +80,11 @@ function SurveyContent() {
         params.set(key, String(value));
       }
     });
-
-    const queryString = params.toString();
-    router.push(queryString ? `${pathname}?${queryString}` : pathname, {
-      scroll: false,
-    });
+    router.push(`${pathname}?${params.toString()}`);
   };
 
-  const handleRefresh = async () => {
-    try {
-      await refetch();
-      toast.success("Data pertanyaan survey berhasil diperbarui.");
-    } catch {
-      toast.error("Gagal menyegarkan data.");
-    }
+  const handleRefresh = () => {
+    refetch();
   };
 
   const columns: DataTableColumn<SurveyPertanyaan>[] = [
@@ -137,10 +135,12 @@ function SurveyContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Survey Layanan & Kepuasan Pengguna
+            {isDokumen ? "Survey Dokumen Hukum Terbit" : "Survey Layanan & Kepuasan Pengguna"}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Pantau indeks kepuasan masyarakat (IKM) dan kelola daftar pertanyaan survey popup portal JDIH.
+            {isDokumen
+              ? "Pantau evaluasi mutu dokumen regulasi yang diunduh masyarakat dan kelola daftar pertanyaan survey."
+              : "Pantau indeks kepuasan masyarakat (IKM) dan kelola daftar pertanyaan survey popup portal JDIH."}
           </p>
         </div>
 
@@ -174,13 +174,17 @@ function SurveyContent() {
       </div>
 
       {/* Tab 1: Grafik Kepuasan Pengguna */}
-      {activeTab === "grafik" && <SurveyStatistikGrafik />}
+      {activeTab === "grafik" && <SurveyStatistikGrafik tipe={tipe} />}
 
       {/* Tab 2: CRUD Pertanyaan Survey */}
       {activeTab === "pertanyaan" && (
         <DataTable
-          title="Daftar Pertanyaan Survey"
-          description="Pertanyaan ini akan otomatis dimunculkan kepada pengunjung landing page dalam bentuk popup survey."
+          title={isDokumen ? "Daftar Pertanyaan Survey Dokumen" : "Daftar Pertanyaan Survey Layanan"}
+          description={
+            isDokumen
+              ? "Pertanyaan ini akan dimunculkan saat pengunjung mengunduh file resmi PDF dokumen hukum."
+              : "Pertanyaan ini akan otomatis dimunculkan kepada pengunjung landing page dalam bentuk popup survey."
+          }
           data={dataList}
           columns={columns}
           getRowId={(row) => row.survey_pertanyaan_id}
@@ -231,6 +235,7 @@ function SurveyContent() {
         <SurveyPertanyaanForm
           mode={drawerMode}
           data={selectedItem}
+          tipe={tipe}
           onSuccess={() => {
             setDrawerOpen(false);
             setSelectedItem(null);

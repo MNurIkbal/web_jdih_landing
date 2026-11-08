@@ -12,7 +12,7 @@ const apiWeb = createApiClient("/web");
 
 // Admin: CRUD Pertanyaan
 export const fetchPertanyaanList = async (
-  params?: PaginationParams
+  params?: PaginationParams & { tipe?: string }
 ): Promise<SpringPage<SurveyPertanyaan>> => {
   const res = await apiMaster.get("/survey/pertanyaan", { params });
   return res.data;
@@ -43,24 +43,27 @@ export const deletePertanyaan = async (id: number): Promise<void> => {
 };
 
 // Admin: Statistik & Grafik Kepuasan
-export const fetchSurveyStatistik = async (): Promise<SurveyStatistik> => {
-  const res = await apiMaster.get("/survey/statistik");
+export const fetchSurveyStatistik = async (tipe: string = "layanan"): Promise<SurveyStatistik> => {
+  const res = await apiMaster.get("/survey/statistik", { params: { tipe } });
   return res.data.data;
 };
 
 // Public: Statistik Kepuasan (tanpa auth admin)
-export const fetchPublicSurveyStatistik = async (): Promise<SurveyStatistik> => {
-  const res = await apiWeb.get("/survey/statistik");
+export const fetchPublicSurveyStatistik = async (tipe: string = "layanan"): Promise<SurveyStatistik> => {
+  const res = await apiWeb.get("/survey/statistik", { params: { tipe } });
   return res.data.data;
 };
 
 // Public: Modal Survey
-export const fetchPublicPertanyaan = async (): Promise<SurveyPertanyaan[]> => {
-  const res = await apiWeb.get("/survey/pertanyaan");
+export const fetchPublicPertanyaan = async (tipe: string = "layanan"): Promise<SurveyPertanyaan[]> => {
+  const res = await apiWeb.get("/survey/pertanyaan", { params: { tipe } });
   return res.data.data;
 };
 
-export const submitPublicSurvey = async (answers: SurveyJawabanSubmission[]): Promise<any> => {
-  const res = await apiWeb.post("/survey/submit", { answers });
+export const submitPublicSurvey = async (
+  answers: SurveyJawabanSubmission[],
+  dokumen_hukum_id?: number | null
+): Promise<{ success: boolean; message: string }> => {
+  const res = await apiWeb.post("/survey/submit", { answers, dokumen_hukum_id });
   return res.data;
 };

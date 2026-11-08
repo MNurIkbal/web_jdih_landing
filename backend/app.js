@@ -124,9 +124,10 @@ app.use("/api/master-data/kontak", authMiddleware, requireRole("superadmin", "ad
 app.use("/api/master-data/galeri", authMiddleware, requireRole("superadmin", "admin"), galeriRoutes);
 app.use("/api/master-data/survey", authMiddleware, requireRole("superadmin", "admin"), surveyRoutes);
 
-// Menu Pengguna & Pengaturan: KHUSUS SUPERADMIN (Admin verifikator & pengguna tidak boleh akses)
+// Menu Pengguna: KHUSUS SUPERADMIN
 app.use("/api/master-data/user", authMiddleware, requireRole("superadmin"), userRoute);
-app.use("/api/master-data/pengaturan", authMiddleware, requireRole("superadmin"), pengaturanRoute);
+// Menu Pengaturan & Dashboard summary dapat diakses oleh superadmin, admin, dan pengguna
+app.use("/api/master-data/pengaturan", authMiddleware, requireRole("superadmin", "admin", "pengguna"), pengaturanRoute);
 
 app.use((req, res) => {
   return res.status(404).json({
